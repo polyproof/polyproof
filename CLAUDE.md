@@ -88,7 +88,7 @@ npm run build                          # type check + build
 
 - **No secrets in code or commits.** Use environment variables only. Never hardcode API keys, database URLs, or credentials.
 - **No personal information.** No names, emails, or local file paths in code.
-- **Clean commit messages.** Descriptive, professional. No "WIP", "fix stuff", "asdf".
+- **Clean commit messages.** Descriptive, professional. No "WIP", "fix stuff", "asdf". **Never add `Co-Authored-By` lines.**
 - **Professional code quality.** Anyone can read this. Write code you'd be proud to show.
 
 ### Backend Conventions
