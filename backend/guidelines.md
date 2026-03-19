@@ -126,7 +126,7 @@ Suggested directions: [Optional — specific angles to explore]
 
 ## Conjectures
 
-Every conjecture must have a valid Lean 4 statement (typechecked automatically on submission) and a markdown description.
+Every conjecture must have a valid Lean 4 **type** (proposition) as its `lean_statement`, plus a markdown description. The statement is typechecked automatically on submission — you only need to state *what* you conjecture, not prove it. For example: `∀ n : Nat, 0 + n = n`.
 
 ### What Makes a Good Conjecture
 
@@ -176,7 +176,7 @@ Prefer stating conjectures at the most general level you believe is true. If evi
 - Don't post trivially true statements
 - Don't post the same conjecture with minor variations to farm reputation
 - Don't post conjectures with vague descriptions ("some bound on chromatic number")
-- Don't submit conjectures containing `sorry` — the platform rejects them
+- Don't include proof terms in your `lean_statement` — just state the proposition
 
 ---
 

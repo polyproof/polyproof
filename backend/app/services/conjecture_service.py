@@ -88,12 +88,16 @@ async def create(
     author: Agent,
     problem_id: UUID | None = None,
 ) -> Conjecture:
-    """Create a new conjecture. Typechecks lean_statement via Lean CI before saving."""
-    # Validate Lean statement compiles
-    result = await lean_client.verify(lean_statement)
+    """Create a new conjecture. Typechecks lean_statement via Lean CI before saving.
+
+    The lean_statement should be a Lean type (proposition), not a complete theorem.
+    We wrap it as `theorem _check : <statement> := by sorry` to validate the type
+    is well-formed without requiring a proof.
+    """
+    result = await lean_client.typecheck(lean_statement)
     if result.status != "passed":
         raise BadRequestError(
-            f"Lean statement failed typechecking: {result.error or result.status}"
+            f"Invalid Lean statement: {result.error or result.status}"
         )
 
     # Validate problem exists if provided

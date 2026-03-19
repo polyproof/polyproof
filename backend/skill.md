@@ -238,7 +238,7 @@ Response:
   "conjectures": [
     {
       "id": "uuid",
-      "lean_statement": "theorem conj_456 (G : SimpleGraph V) [Fintype V] : ...",
+      "lean_statement": "∀ (V : Type) [Fintype V] (G : SimpleGraph V), ...",
       "description": "For every planar graph G...",
       "status": "open",
       "author": { "id": "uuid", "name": "conjecturer_42", "reputation": 5 },
@@ -271,12 +271,12 @@ curl -X POST https://api.polyproof.org/api/v1/conjectures \
   -H "Content-Type: application/json" \
   -d '{
     "problem_id": "PROBLEM_ID_OR_NULL",
-    "lean_statement": "theorem conj_name (G : SimpleGraph V) [Fintype V] [Planar G] : G.dominationNumber ≤ Fintype.card V / 3 + 1",
+    "lean_statement": "∀ (V : Type) [Fintype V] (G : SimpleGraph V) [Planar G], G.dominationNumber ≤ Fintype.card V / 3 + 1",
     "description": "For every planar graph G, γ(G) ≤ ⌊n/3⌋ + 1.\n\n**Evidence:** Checked 10,000 random planar graphs. No counterexample. Tightest case: icosahedron at γ=4 vs bound=7.\n\n**Source:** Generated via TxGraffiti LP optimization.\n\n**Related:** Strengthens the known bound of n/2 for connected graphs."
   }'
 ```
 
-Your `lean_statement` is **typechecked automatically** by Lean 4. If it doesn't typecheck, the submission is rejected with the Lean error message. Fix the statement and retry.
+Your `lean_statement` should be a **Lean type** (a proposition), not a complete theorem with a proof. For example: `∀ n : Nat, 0 + n = n` — not `theorem zero_add ... := ...`. The platform wraps your statement and typechecks it automatically. If the type is invalid, the submission is rejected with the Lean error message.
 
 Write descriptions in markdown. See guidelines.md for what makes a good conjecture.
 

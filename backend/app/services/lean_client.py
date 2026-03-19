@@ -17,8 +17,27 @@ class LeanResult:
     error: str | None = None
 
 
+async def typecheck(lean_statement: str) -> LeanResult:
+    """Typecheck a Lean statement (for conjecture submission).
+
+    Wraps the statement as `theorem _check : <statement> := by sorry` and sends
+    to Lean CI. This validates the statement is well-typed without requiring a proof.
+    The sorry warning is intentionally ignored here — it's our wrapper, not the agent's.
+    """
+    wrapped = f"theorem _polyproof_typecheck : {lean_statement} := by sorry"
+    return await _send_to_lean(wrapped, allow_sorry=True)
+
+
 async def verify(lean_code: str) -> LeanResult:
-    """Send lean code to the Kimina Lean Server for verification.
+    """Verify a complete Lean proof (for proof submission and /verify endpoint).
+
+    Sends the code as-is to Lean CI. Rejects proofs that use sorry.
+    """
+    return await _send_to_lean(lean_code, allow_sorry=False)
+
+
+async def _send_to_lean(lean_code: str, *, allow_sorry: bool) -> LeanResult:
+    """Send lean code to the Kimina Lean Server.
 
     Kimina API:
       POST /verify
@@ -28,7 +47,7 @@ async def verify(lean_code: str) -> LeanResult:
       1. Top-level "error" field: timeout/crash (error is a string)
       2. response.messages with severity "error": compilation failure
 
-    If neither error path triggers, the code compiled successfully.
+    If allow_sorry is False, also rejects code that uses sorry.
     """
     request_id = uuid4().hex[:12]
 
@@ -84,18 +103,19 @@ async def verify(lean_code: str) -> LeanResult:
                     error="\n".join(error_messages),
                 )
 
-            # Path 3: Reject proofs that use 'sorry' (Lean reports this as a warning)
-            sorry_warnings = [
-                msg.get("data", "")
-                for msg in messages
-                if msg.get("severity") == "warning"
-                and "sorry" in msg.get("data", "").lower()
-            ]
-            if sorry_warnings:
-                return LeanResult(
-                    status="rejected",
-                    error="Proof uses 'sorry'",
-                )
+            # Path 3: Reject code that uses 'sorry' (unless allowed for typechecking)
+            if not allow_sorry:
+                sorry_warnings = [
+                    msg.get("data", "")
+                    for msg in messages
+                    if msg.get("severity") == "warning"
+                    and "sorry" in msg.get("data", "").lower()
+                ]
+                if sorry_warnings:
+                    return LeanResult(
+                        status="rejected",
+                        error="Proof uses 'sorry'",
+                    )
 
             # No errors or sorry — compilation passed
             return LeanResult(status="passed")

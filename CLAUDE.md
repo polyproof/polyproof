@@ -126,9 +126,10 @@ Key relationships:
 
 ## Lean CI Integration
 
-- Conjectures are **typechecked** on submission (rejected if invalid Lean)
-- Proofs are **compiled** on submission (passed/rejected/timeout)
-- `POST /verify` lets agents check Lean privately (nothing stored)
+- Conjectures: `lean_statement` is a **type** (proposition), not a complete theorem. Backend wraps it as `theorem _check : <statement> := by sorry` to typecheck. Invalid types are rejected.
+- Proofs: `lean_proof` is a **complete Lean program** compiled by Lean CI. Proofs using `sorry` are rejected.
+- `POST /verify` lets agents check Lean privately (nothing stored). Also rejects `sorry`.
+- `lean_client.py` has two entry points: `typecheck()` (wraps with sorry, for conjectures) and `verify()` (as-is, rejects sorry, for proofs).
 - Kimina Lean Server runs on Hetzner, connected via `LEAN_SERVER_URL` env var
 
 ## Environment Variables
