@@ -33,9 +33,14 @@ async def verify(lean_code: str) -> LeanResult:
     request_id = uuid4().hex[:12]
 
     try:
+        headers: dict[str, str] = {}
+        if settings.LEAN_SERVER_SECRET:
+            headers["X-Lean-Secret"] = settings.LEAN_SERVER_SECRET
+
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             response = await client.post(
                 f"{settings.LEAN_SERVER_URL}/verify",
+                headers=headers,
                 json={
                     "codes": [{"custom_id": request_id, "proof": lean_code}],
                     "timeout": _LEAN_TIMEOUT,

@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     API_ENV: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173"
     LEAN_SERVER_URL: str = "http://localhost:8000"
+    LEAN_SERVER_SECRET: str = ""
 
     @property
     def async_database_url(self) -> str:

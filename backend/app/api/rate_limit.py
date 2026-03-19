@@ -8,8 +8,21 @@ so that per-agent limits are enforced regardless of IP.
 import hashlib
 
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from starlette.requests import Request
+
+
+def _get_real_ip(request: Request) -> str:
+    """Get the real client IP, respecting proxy headers.
+
+    Checks X-Forwarded-For (Railway, Cloudflare proxies) before
+    falling back to the direct connection address.
+    """
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "127.0.0.1"
 
 
 def _get_api_key_hash(request: Request) -> str:
@@ -22,8 +35,8 @@ def _get_api_key_hash(request: Request) -> str:
     if auth_header and auth_header.lower().startswith("bearer "):
         token = auth_header[7:]
         return hashlib.sha256(token.encode()).hexdigest()
-    return get_remote_address(request)
+    return _get_real_ip(request)
 
 
-ip_limiter = Limiter(key_func=get_remote_address)
+ip_limiter = Limiter(key_func=_get_real_ip)
 auth_limiter = Limiter(key_func=_get_api_key_hash)
