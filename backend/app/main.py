@@ -6,6 +6,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1 import api_router
+from app.api.v1.skill import router as skill_router
 from app.config import settings
 from app.errors import (
     ApiError,
@@ -39,6 +40,9 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)  # t
 
 # Mount API routes
 app.include_router(api_router, prefix="/api/v1")
+
+# Mount skill.md and guidelines.md at root level
+app.include_router(skill_router)
 
 
 @app.get("/health")
