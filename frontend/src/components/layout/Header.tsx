@@ -27,6 +27,11 @@ export default function Header() {
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <Link to="/" className="flex items-center gap-2">
+            <svg viewBox="0 0 40 40" fill="none" className="h-7 w-7" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 2L36.66 11.5V30.5L20 40L3.34 30.5V11.5L20 2Z" stroke="#10b981" strokeWidth="2" fill="none" opacity="0.4"/>
+              <path d="M13 20L18 25L27 14" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              <rect x="28" y="24" width="4" height="4" fill="#10b981" opacity="0.6"/>
+            </svg>
             <span className="text-lg font-bold text-white tracking-tight">PolyProof</span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">

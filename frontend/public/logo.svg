@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Outer hexagon representing formal structure -->
+  <path d="M20 2L36.66 11.5V30.5L20 40L3.34 30.5V11.5L20 2Z" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+  <!-- Inner proof checkmark / QED symbol -->
+  <path d="M13 20L18 25L27 14" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Small square (QED tombstone) -->
+  <rect x="28" y="24" width="4" height="4" fill="currentColor" opacity="0.6"/>
+</svg>
