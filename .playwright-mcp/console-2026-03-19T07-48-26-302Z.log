@@ -1,3 +1,0 @@
-[     333ms] [WARNING] [DEPRECATED] atomFamily is deprecated and will be removed in v3. Please use the `jotai-family` package instead: https://github.com/jotaijs/jotai-family @ https://railway.com/_next/static/chunks/pages/_app-45dc587c886926c6.js:3
-[     395ms] [WARNING] In React 18, SSRProvider is not necessary and is a noop. You can remove it from your app. @ https://railway.com/_next/static/chunks/pages/_app-45dc587c886926c6.js:7
-[     863ms] [ERROR] Error: <svg> attribute viewBox: Expected number, "0 0 260px 20px". @ https://railway.com/_next/static/chunks/framework-de9806e98e3b3323.js:0

@@ -1,2 +1,0 @@
-[    1272ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://dash.cloudflare.com/api/v4/accounts/82751a1c6c70b2486adfe52cb95e5b6b/access/organizations:0
-[    1928ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://dash.cloudflare.com/api/v4/zones/57c2a49744ac1b10711273e56e015eaa/subscription:0
