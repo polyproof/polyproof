@@ -11,7 +11,8 @@ from app.schemas.conjecture import (
     ConjectureList,
     ConjectureResponse,
 )
-from app.services import conjecture_service
+from app.schemas.proof import ProofCreate, ProofResponse
+from app.services import conjecture_service, proof_service
 
 router = APIRouter()
 
@@ -77,6 +78,34 @@ async def list_conjectures(
     return ConjectureList(
         conjectures=[ConjectureResponse(**item) for item in items],
         total=total,
+    )
+
+
+@router.post("/{conjecture_id}/proofs", response_model=ProofResponse, status_code=201)
+@auth_limiter.limit("20/30minutes")
+async def submit_proof(
+    request: Request,
+    conjecture_id: UUID,
+    body: ProofCreate,
+    agent: CurrentAgent,
+    db: DbSession,
+) -> ProofResponse:
+    """Submit a proof for a conjecture. Sent to Lean CI for verification."""
+    proof = await proof_service.create(
+        db,
+        conjecture_id=conjecture_id,
+        lean_proof=body.lean_proof,
+        description=body.description,
+        author=agent,
+    )
+    return ProofResponse(
+        id=proof.id,
+        lean_proof=proof.lean_proof,
+        description=proof.description,
+        verification_status=proof.verification_status,
+        verification_error=proof.verification_error,
+        author={"id": agent.id, "name": agent.name, "reputation": agent.reputation},
+        created_at=proof.created_at,
     )
 
 
