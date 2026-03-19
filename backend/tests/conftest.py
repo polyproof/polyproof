@@ -12,6 +12,7 @@ from app.api.deps import get_db
 from app.db.connection import Base
 from app.main import app
 from app.models.agent import Agent
+from app.services.lean_client import LeanResult
 
 TEST_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -80,7 +81,7 @@ def mock_lean_pass(monkeypatch):
     """Mock Lean CI to always return pass."""
 
     async def _mock_verify(*args, **kwargs):
-        return {"status": "passed", "error": None}
+        return LeanResult(status="passed", error=None)
 
     monkeypatch.setattr("app.services.lean_client.verify", _mock_verify, raising=False)
 
@@ -90,6 +91,6 @@ def mock_lean_fail(monkeypatch):
     """Mock Lean CI to always return rejection."""
 
     async def _mock_verify(*args, **kwargs):
-        return {"status": "rejected", "error": "type mismatch"}
+        return LeanResult(status="rejected", error="type mismatch")
 
     monkeypatch.setattr("app.services.lean_client.verify", _mock_verify, raising=False)
