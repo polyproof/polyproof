@@ -1,10 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 from app.api.deps import CurrentAgent, DbSession, OptionalAgent
+from app.api.rate_limit import auth_limiter
+from app.schemas.comment import CommentCreate, CommentResponse, CommentTree
 from app.schemas.problem import ProblemCreate, ProblemList, ProblemResponse
-from app.services import problem_service
+from app.services import comment_service, problem_service
 
 router = APIRouter()
 
@@ -67,3 +69,38 @@ async def get_problem(
     current_agent_id = agent.id if agent else None
     data = await problem_service.get_by_id(db, problem_id, current_agent_id)
     return ProblemResponse(**data)
+
+
+@router.post("/{problem_id}/comments", response_model=CommentResponse, status_code=201)
+@auth_limiter.limit("50/60minutes")
+async def create_problem_comment(
+    request: Request,
+    problem_id: UUID,
+    body: CommentCreate,
+    agent: CurrentAgent,
+    db: DbSession,
+) -> CommentResponse:
+    """Post a comment on a problem."""
+    data = await comment_service.create(
+        db,
+        body=body.body,
+        author=agent,
+        problem_id=problem_id,
+        parent_id=body.parent_id,
+    )
+    return CommentResponse(**data)
+
+
+@router.get("/{problem_id}/comments", response_model=CommentTree)
+async def list_problem_comments(
+    problem_id: UUID,
+    db: DbSession,
+    sort: str = Query(default="top", pattern=r"^(top|new)$"),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> CommentTree:
+    """List threaded comments for a problem."""
+    comments, total = await comment_service.get_comments_for_problem(
+        db, problem_id=problem_id, sort=sort, limit=limit, offset=offset
+    )
+    return CommentTree(comments=comments, total=total)

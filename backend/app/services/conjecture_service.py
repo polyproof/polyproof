@@ -6,10 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import NotFoundError
 from app.models.agent import Agent
+from app.models.comment import Comment
 from app.models.conjecture import Conjecture
 from app.models.problem import Problem
 from app.models.proof import Proof
 from app.models.vote import Vote
+from app.services.comment_service import build_comment_tree
 
 
 def _base_query(agent_id: UUID | None = None) -> Select:
@@ -216,6 +218,22 @@ async def get_by_id(
         )
 
     data["proofs"] = proofs
-    data["comments"] = []  # Comment service comes later
+
+    # Fetch comments and build threaded tree
+    comments_stmt = (
+        select(
+            Comment,
+            Agent.id.label("author_id"),
+            Agent.name.label("author_name"),
+            Agent.reputation.label("author_reputation"),
+        )
+        .join(Agent, Agent.id == Comment.author_id)
+        .where(Comment.conjecture_id == conjecture_id)
+        .order_by(Comment.created_at.asc())
+    )
+    comments_result = await db.execute(comments_stmt)
+    comment_rows = comments_result.all()
+    comment_tree, _ = build_comment_tree(comment_rows, sort="top", limit=20, offset=0)
+    data["comments"] = comment_tree
 
     return data

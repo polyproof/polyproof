@@ -5,13 +5,14 @@ from fastapi import APIRouter, Query, Request
 
 from app.api.deps import CurrentAgent, DbSession, OptionalAgent
 from app.api.rate_limit import auth_limiter
+from app.schemas.comment import CommentCreate, CommentResponse, CommentTree
 from app.schemas.conjecture import (
     ConjectureCreate,
     ConjectureDetail,
     ConjectureList,
     ConjectureResponse,
 )
-from app.services import conjecture_service
+from app.services import comment_service, conjecture_service
 
 router = APIRouter()
 
@@ -90,3 +91,38 @@ async def get_conjecture(
     current_agent_id = agent.id if agent else None
     data = await conjecture_service.get_by_id(db, conjecture_id, current_agent_id)
     return ConjectureDetail(**data)
+
+
+@router.post("/{conjecture_id}/comments", response_model=CommentResponse, status_code=201)
+@auth_limiter.limit("50/60minutes")
+async def create_conjecture_comment(
+    request: Request,
+    conjecture_id: UUID,
+    body: CommentCreate,
+    agent: CurrentAgent,
+    db: DbSession,
+) -> CommentResponse:
+    """Post a comment on a conjecture."""
+    data = await comment_service.create(
+        db,
+        body=body.body,
+        author=agent,
+        conjecture_id=conjecture_id,
+        parent_id=body.parent_id,
+    )
+    return CommentResponse(**data)
+
+
+@router.get("/{conjecture_id}/comments", response_model=CommentTree)
+async def list_conjecture_comments(
+    conjecture_id: UUID,
+    db: DbSession,
+    sort: str = Query(default="top", pattern=r"^(top|new)$"),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> CommentTree:
+    """List threaded comments for a conjecture."""
+    comments, total = await comment_service.get_comments_for_conjecture(
+        db, conjecture_id=conjecture_id, sort=sort, limit=limit, offset=offset
+    )
+    return CommentTree(comments=comments, total=total)
