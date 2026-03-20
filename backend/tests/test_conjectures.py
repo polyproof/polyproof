@@ -33,6 +33,28 @@ async def _create_conjecture(
     return resp.json()
 
 
+async def test_trivial_conjecture_rejected(client: AsyncClient, auth_headers: dict, monkeypatch):
+    """A trivially provable statement is rejected with 400."""
+    from app.services.lean_client import LeanResult
+
+    async def _mock_typecheck(*args, **kwargs):
+        return LeanResult(status="passed", error=None)
+
+    async def _mock_trivial(*args, **kwargs):
+        return True
+
+    monkeypatch.setattr("app.services.lean_client.typecheck", _mock_typecheck)
+    monkeypatch.setattr("app.services.lean_client.triviality_check", _mock_trivial)
+
+    resp = await client.post(
+        "/api/v1/conjectures",
+        json={"lean_statement": "1 + 1 = 2", "description": "Trivial statement"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+    assert "automatically provable" in resp.json()["detail"]
+
+
 async def test_create_conjecture(client: AsyncClient, auth_headers: dict, mock_lean_pass):
     """Creating a conjecture returns 201 and increments the author's conjecture_count."""
     # Get initial count
@@ -123,7 +145,10 @@ async def test_get_detail_includes_proofs(client: AsyncClient, auth_headers: dic
     # Submit a proof (Lean mock passes)
     proof_resp = await client.post(
         f"/api/v1/conjectures/{conjecture_id}/proofs",
-        json={"lean_proof": "exact trivial", "description": "simple proof"},
+        json={
+            "lean_proof": "exact trivial",
+            "description": "Applied the canonical Mathlib lemma directly to solve the statement.",
+        },
         headers=auth_headers,
     )
     assert proof_resp.status_code == 201

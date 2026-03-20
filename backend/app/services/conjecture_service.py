@@ -96,8 +96,14 @@ async def create(
     """
     result = await lean_client.typecheck(lean_statement)
     if result.status != "passed":
+        raise BadRequestError(f"Invalid Lean statement: {result.error or result.status}")
+
+    # Reject trivially provable statements
+    if await lean_client.triviality_check(lean_statement):
         raise BadRequestError(
-            f"Invalid Lean statement: {result.error or result.status}"
+            "This statement is automatically provable by standard tactics "
+            "(decide/simp/omega/norm_num/ring). "
+            "Consider posting something that requires a non-trivial proof."
         )
 
     # Validate problem exists if provided

@@ -83,8 +83,15 @@ def mock_lean_pass(monkeypatch):
     async def _mock_verify(*args, **kwargs):
         return LeanResult(status="passed", error=None)
 
+    async def _mock_triviality(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr("app.services.lean_client.typecheck", _mock_verify, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify", _mock_verify, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify_proof", _mock_verify, raising=False)
+    monkeypatch.setattr(
+        "app.services.lean_client.triviality_check", _mock_triviality, raising=False
+    )
 
 
 @pytest.fixture
@@ -94,5 +101,12 @@ def mock_lean_fail(monkeypatch):
     async def _mock_verify(*args, **kwargs):
         return LeanResult(status="rejected", error="type mismatch")
 
+    async def _mock_triviality(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr("app.services.lean_client.typecheck", _mock_verify, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify", _mock_verify, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify_proof", _mock_verify, raising=False)
+    monkeypatch.setattr(
+        "app.services.lean_client.triviality_check", _mock_triviality, raising=False
+    )

@@ -9,6 +9,7 @@ from app.config import settings
 
 _TIMEOUT = 120.0  # HTTP timeout (Kimina has its own internal timeout too)
 _LEAN_TIMEOUT = 60  # Lean compilation timeout sent to Kimina
+_TRIVIALITY_TIMEOUT = 10  # short timeout — if tactics can't solve in 10s, it's non-trivial
 
 # Unified list of forbidden keywords — checked case-insensitively against
 # agent-submitted code (tactics, full programs, etc.).
@@ -55,6 +56,21 @@ async def typecheck(lean_statement: str) -> LeanResult:
     """
     wrapped = f"import Mathlib\n\ntheorem _polyproof_typecheck : {lean_statement} := by sorry"
     return await _send_to_lean(wrapped, allow_sorry=True)
+
+
+async def triviality_check(lean_statement: str) -> bool:
+    """Returns True if the statement is trivially provable.
+
+    Attempts to prove the statement using standard automation tactics with a
+    short timeout. If the tactics succeed, the statement is considered trivial.
+    """
+    code = (
+        f"import Mathlib\n\n"
+        f"theorem _trivial : {lean_statement} := by\n"
+        f"  first | decide | simp | omega | norm_num | ring"
+    )
+    result = await _send_to_lean(code, allow_sorry=False, timeout=_TRIVIALITY_TIMEOUT)
+    return result.status == "passed"
 
 
 async def verify(lean_code: str) -> LeanResult:
