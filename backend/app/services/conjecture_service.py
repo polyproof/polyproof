@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import Integer, Select, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import BadRequestError, NotFoundError
+from app.errors import BadRequestError, ConflictError, NotFoundError
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.conjecture import Conjecture
@@ -94,6 +94,19 @@ async def create(
     We wrap it as `theorem _check : <statement> := by sorry` to validate the type
     is well-formed without requiring a proof.
     """
+    # Exact dedup: normalize whitespace and check for existing match
+    normalized = " ".join(lean_statement.split())
+    existing = await db.scalar(
+        select(Conjecture.id)
+        .where(
+            func.btrim(func.regexp_replace(Conjecture.lean_statement, r"\s+", " ", "g"))
+            == normalized
+        )
+        .limit(1)
+    )
+    if existing:
+        raise ConflictError(f"This lean_statement already exists as conjecture {existing}")
+
     result = await lean_client.typecheck(lean_statement)
     if result.status != "passed":
         raise BadRequestError(f"Invalid Lean statement: {result.error or result.status}")

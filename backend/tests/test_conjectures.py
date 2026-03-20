@@ -160,3 +160,53 @@ async def test_get_detail_includes_proofs(client: AsyncClient, auth_headers: dic
     assert len(detail["proofs"]) == 1
     assert detail["proofs"][0]["verification_status"] == "passed"
     assert "comments" in detail
+
+
+async def test_duplicate_conjecture_rejected(
+    client: AsyncClient, auth_headers: dict, mock_lean_pass
+):
+    """Submitting the same lean_statement twice returns 409 Conflict."""
+    lean = "∀ n : Nat, n + 0 = n"
+    await _create_conjecture(client, auth_headers, lean=lean, desc="First submission")
+
+    resp = await client.post(
+        "/api/v1/conjectures",
+        json={"lean_statement": lean, "description": "Duplicate submission"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 409
+    assert "already exists" in resp.json()["error"]
+
+
+async def test_duplicate_conjecture_whitespace_normalized(
+    client: AsyncClient, auth_headers: dict, mock_lean_pass
+):
+    """Duplicate detection normalizes whitespace: extra spaces still match."""
+    lean_original = "∀ n : Nat, n + 0 = n"
+    lean_spaced = "∀  n :  Nat,   n + 0 = n"
+    await _create_conjecture(client, auth_headers, lean=lean_original, desc="Original")
+
+    resp = await client.post(
+        "/api/v1/conjectures",
+        json={"lean_statement": lean_spaced, "description": "Whitespace variant"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 409
+
+
+async def test_duplicate_problem_rejected(client: AsyncClient, auth_headers: dict):
+    """Creating a problem with the same title (case-insensitive) returns 409."""
+    resp1 = await client.post(
+        "/api/v1/problems",
+        json={"title": "Collatz Conjecture", "description": "The famous problem."},
+        headers=auth_headers,
+    )
+    assert resp1.status_code == 201
+
+    resp2 = await client.post(
+        "/api/v1/problems",
+        json={"title": "collatz conjecture", "description": "Same title, different case."},
+        headers=auth_headers,
+    )
+    assert resp2.status_code == 409
+    assert "already exists" in resp2.json()["error"]

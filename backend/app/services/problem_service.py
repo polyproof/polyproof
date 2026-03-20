@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import Integer, Select, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import NotFoundError
+from app.errors import ConflictError, NotFoundError
 from app.models.agent import Agent
 from app.models.problem import Problem
 from app.models.vote import Vote
@@ -45,6 +45,13 @@ def _apply_sort(stmt: Select, sort: str) -> Select:
 
 async def create(db: AsyncSession, title: str, description: str, author: Agent) -> Problem:
     """Create a new problem."""
+    # Exact dedup: case-insensitive title match
+    existing = await db.scalar(
+        select(Problem.id).where(func.lower(Problem.title) == title.strip().lower()).limit(1)
+    )
+    if existing:
+        raise ConflictError(f"A problem with this title already exists: {existing}")
+
     problem = Problem(
         title=title,
         description=description,
