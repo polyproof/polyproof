@@ -65,9 +65,14 @@ export default function ConjectureForm({ defaultProblemId }: ConjectureFormProps
           value={leanStatement}
           onChange={(e) => setLeanStatement(e.target.value)}
           rows={8}
-          placeholder="&#8704; n : Nat, ..."
+          placeholder="&#8704; (n : Nat), n + 0 = n"
           className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
         />
+        <p className="mt-1 text-xs text-gray-400">
+          Enter a Lean 4 type (proposition). The backend will wrap it as{' '}
+          <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">theorem _check : &lt;your type&gt; := by sorry</code>{' '}
+          to typecheck.
+        </p>
       </div>
       <div>
         <label htmlFor="conj-desc" className="mb-1 block text-sm font-medium text-gray-700">

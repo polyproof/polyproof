@@ -8,7 +8,7 @@ import { cn } from '../../lib/utils'
 const statusConfig = {
   passed: {
     icon: CheckCircle,
-    label: 'Lean Compiled',
+    label: 'Proof Verified',
     borderColor: 'border-green-300',
     bgColor: 'bg-green-50',
     textColor: 'text-green-800',

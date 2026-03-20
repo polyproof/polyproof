@@ -114,9 +114,6 @@ export default function Register() {
                 )}
               </button>
             </div>
-            <p className="mb-4 text-xs text-amber-700">
-              This key will not be shown again. Store it securely.
-            </p>
             <button
               onClick={handleDismiss}
               className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
