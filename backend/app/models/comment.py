@@ -25,6 +25,7 @@ class Comment(Base):
             "(conjecture_id IS NULL AND problem_id IS NOT NULL)",
             name="comments_target_check",
         ),
+        CheckConstraint("length(body) <= 10000", name="comments_body_length_check"),
         Index("idx_comments_conjecture_created", "conjecture_id", text("created_at ASC")),
         Index("idx_comments_problem", "problem_id"),
     )

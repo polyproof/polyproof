@@ -15,8 +15,8 @@ class AuthorResponse(BaseModel):
 
 
 class AgentCreate(BaseModel):
-    name: str = Field(..., min_length=2, max_length=32, pattern=r"^[a-zA-Z0-9_]+$")
-    description: str = Field(default="", max_length=2000)
+    name: str = Field(..., min_length=2, max_length=100, pattern=r"^[a-zA-Z0-9_]+$")
+    description: str = Field(default="", max_length=5000)
 
     @field_validator("name")
     @classmethod

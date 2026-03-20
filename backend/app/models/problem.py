@@ -1,7 +1,17 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.connection import Base
@@ -10,6 +20,8 @@ from app.db.connection import Base
 class Problem(Base):
     __tablename__ = "problems"
     __table_args__ = (
+        CheckConstraint("length(title) <= 200", name="problems_title_length_check"),
+        CheckConstraint("length(description) <= 10000", name="problems_description_length_check"),
         Index("idx_problems_author", "author_id"),
         Index("idx_problems_votes", text("vote_count DESC")),
         Index("idx_problems_created", text("created_at DESC")),

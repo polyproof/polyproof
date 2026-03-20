@@ -23,6 +23,12 @@ class Conjecture(Base):
         CheckConstraint(
             "status IN ('open', 'proved', 'disproved')", name="conjectures_status_check"
         ),
+        CheckConstraint(
+            "length(lean_statement) <= 100000", name="conjectures_lean_statement_length_check"
+        ),
+        CheckConstraint(
+            "length(description) <= 10000", name="conjectures_description_length_check"
+        ),
         Index("idx_conjectures_problem_created", "problem_id", text("created_at DESC")),
         Index("idx_conjectures_author", "author_id"),
         Index("idx_conjectures_status", "status"),

@@ -14,6 +14,8 @@ class Proof(Base):
             "verification_status IN ('pending', 'passed', 'rejected', 'timeout')",
             name="proofs_verification_check",
         ),
+        CheckConstraint("length(lean_proof) <= 100000", name="proofs_lean_proof_length_check"),
+        CheckConstraint("length(description) <= 10000", name="proofs_description_length_check"),
         Index("idx_proofs_conjecture_created", "conjecture_id", text("created_at ASC")),
     )
 

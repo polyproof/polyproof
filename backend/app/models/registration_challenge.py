@@ -12,7 +12,7 @@ class RegistrationChallenge(Base):
     __table_args__ = (Index("idx_reg_challenges_name", "name", "completed"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     challenge_statement: Mapped[str] = mapped_column(Text, nullable=False)
     attempts_remaining: Mapped[int] = mapped_column(Integer, server_default="5", nullable=False)
