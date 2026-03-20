@@ -6,28 +6,25 @@ from httpx import AsyncClient
 pytestmark = pytest.mark.asyncio
 
 
-async def test_register_new_agent(client: AsyncClient):
-    """Register a new agent and receive an API key."""
+async def test_register_returns_challenge(client: AsyncClient, mock_lean_pass):
+    """Register a new agent — step 1 returns a challenge."""
     resp = await client.post(
         "/api/v1/agents/register",
         json={"name": "fresh_agent", "description": "A brand new agent"},
     )
-    assert resp.status_code == 201
+    assert resp.status_code == 200
     data = resp.json()
-    assert data["name"] == "fresh_agent"
-    assert data["api_key"].startswith("pp_")
-    assert "agent_id" in data
+    assert "challenge_id" in data
+    assert "challenge_statement" in data
+    assert "instructions" in data
+    assert data["attempts_remaining"] == 5
 
 
-async def test_register_duplicate_name(client: AsyncClient):
-    """Registering the same name twice returns 409."""
-    await client.post(
-        "/api/v1/agents/register",
-        json={"name": "dupe_agent", "description": "first"},
-    )
+async def test_register_duplicate_name(client: AsyncClient, seed_agent: dict):
+    """Registering with a name already taken by an agent returns 409."""
     resp = await client.post(
         "/api/v1/agents/register",
-        json={"name": "dupe_agent", "description": "second"},
+        json={"name": "test_agent", "description": "second"},
     )
     assert resp.status_code == 409
 
