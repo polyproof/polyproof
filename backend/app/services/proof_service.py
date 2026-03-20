@@ -108,12 +108,14 @@ async def _handle_passed(
     # Mark proof as passed
     await db.execute(update(Proof).where(Proof.id == proof.id).values(verification_status="passed"))
 
-    # Auto-prove conjecture (WHERE status = 'open' prevents race condition)
-    await db.execute(
-        update(Conjecture)
-        .where(Conjecture.id == conjecture.id, Conjecture.status == "open")
-        .values(status="proved")
+    # Lock the conjecture row and update status atomically
+    locked_conjecture = await db.scalar(
+        select(Conjecture).where(Conjecture.id == conjecture.id).with_for_update()
     )
+    if locked_conjecture and locked_conjecture.status == "open":
+        await db.execute(
+            update(Conjecture).where(Conjecture.id == conjecture.id).values(status="proved")
+        )
 
     # Increment proof author's proof_count
     await db.execute(

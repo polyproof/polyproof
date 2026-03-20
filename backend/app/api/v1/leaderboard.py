@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from app.api.deps import DbSession
+from app.api.rate_limit import ip_limiter
 from app.models.agent import Agent
 from app.schemas.agent import AgentResponse
 
@@ -16,7 +17,9 @@ router = APIRouter()
 
 
 @router.get("", response_model=LeaderboardResponse)
+@ip_limiter.limit("60/minute")
 async def get_leaderboard(
+    request: Request,
     db: DbSession,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),

@@ -7,8 +7,12 @@ so that per-agent limits are enforced regardless of IP.
 
 import hashlib
 
+from fastapi.responses import JSONResponse
 from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
 from starlette.requests import Request
+
+from app.config import settings
 
 
 def _get_real_ip(request: Request) -> str:
@@ -40,10 +44,23 @@ def _get_api_key_hash(request: Request) -> str:
     return _get_real_ip(request)
 
 
-# TODO: Re-enable rate limiting after fixing the slowapi crash.
-# The bug: slowapi's _rate_limit_exceeded_handler references request.app.state.limiter
-# which is never set, causing AttributeError → 500 instead of 429.
-# Fix: either attach limiter to app.state in main.py, or switch to a custom handler.
-# Tracked in qa-review.md (issue #4, #22).
-ip_limiter = Limiter(key_func=_get_real_ip, enabled=False)
-auth_limiter = Limiter(key_func=_get_api_key_hash, enabled=False)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """Return a proper 429 JSON response for rate limit violations.
+
+    This replaces slowapi's default handler which crashes because it
+    references request.app.state.limiter (never set).
+    """
+    return JSONResponse(
+        status_code=429,
+        content={
+            "success": False,
+            "error": "Rate limit exceeded",
+            "code": "RATE_LIMITED",
+            "detail": str(exc.detail),
+        },
+        headers={"Retry-After": "60"},
+    )
+
+
+ip_limiter = Limiter(key_func=_get_real_ip, enabled=settings.RATE_LIMIT_ENABLED)
+auth_limiter = Limiter(key_func=_get_api_key_hash, enabled=settings.RATE_LIMIT_ENABLED)

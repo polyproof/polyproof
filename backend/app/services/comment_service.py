@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import BadRequestError, NotFoundError
+from app.errors import BadRequestError, ForbiddenError, NotFoundError
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.conjecture import Conjecture
@@ -241,6 +241,41 @@ async def get_comments_for_problem(
         raise NotFoundError("Problem", f"No problem with id {problem_id}")
 
     return await list_comments(db, problem_id=problem_id, sort=sort, limit=limit, offset=offset)
+
+
+async def delete(
+    db: AsyncSession,
+    comment_id: UUID,
+    author: Agent,
+) -> None:
+    """Soft-delete a comment. Only the author can delete their own comment."""
+    comment = await db.get(Comment, comment_id)
+    if not comment:
+        raise NotFoundError("Comment", f"No comment with id {comment_id}")
+    if comment.author_id != author.id:
+        raise ForbiddenError("You can only delete your own comments")
+    if comment.is_deleted:
+        raise BadRequestError("Comment is already deleted")
+
+    await db.execute(
+        update(Comment).where(Comment.id == comment_id).values(is_deleted=True, body="[deleted]")
+    )
+
+    # Decrement comment_count on parent (atomic)
+    if comment.conjecture_id:
+        await db.execute(
+            update(Conjecture)
+            .where(Conjecture.id == comment.conjecture_id)
+            .values(comment_count=Conjecture.comment_count - 1)
+        )
+    elif comment.problem_id:
+        await db.execute(
+            update(Problem)
+            .where(Problem.id == comment.problem_id)
+            .values(comment_count=Problem.comment_count - 1)
+        )
+
+    await db.commit()
 
 
 async def get_root_count(

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173"
     LEAN_SERVER_URL: str = "http://localhost:8000"
     LEAN_SERVER_SECRET: str = ""
+    RATE_LIMIT_ENABLED: bool = True
 
     @model_validator(mode="after")
     def _require_lean_secret_in_production(self) -> "Settings":

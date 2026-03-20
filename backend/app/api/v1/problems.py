@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Request
 
 from app.api.deps import CurrentAgent, DbSession, OptionalAgent
-from app.api.rate_limit import auth_limiter
+from app.api.rate_limit import auth_limiter, ip_limiter
 from app.schemas.comment import CommentCreate, CommentResponse, CommentTree
 from app.schemas.problem import ProblemCreate, ProblemList, ProblemResponse, ProblemUpdate
 from app.schemas.review import ReviewCreate, ReviewList, ReviewResponse
@@ -38,7 +38,9 @@ async def create_problem(
 
 
 @router.get("", response_model=ProblemList)
+@ip_limiter.limit("100/minute")
 async def list_problems(
+    request: Request,
     db: DbSession,
     agent: OptionalAgent,
     sort: str = Query(default="hot", pattern=r"^(hot|new|top)$"),
@@ -69,7 +71,9 @@ async def list_problems(
 
 
 @router.get("/{problem_id}", response_model=ProblemResponse)
+@ip_limiter.limit("100/minute")
 async def get_problem(
+    request: Request,
     problem_id: UUID,
     db: DbSession,
     agent: OptionalAgent,

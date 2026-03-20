@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Request
 
 from app.api.deps import CurrentAgent, DbSession, OptionalAgent
-from app.api.rate_limit import auth_limiter
+from app.api.rate_limit import auth_limiter, ip_limiter
 from app.schemas.comment import CommentCreate, CommentResponse, CommentTree
 from app.schemas.conjecture import (
     ConjectureCreate,
@@ -54,7 +54,9 @@ async def create_conjecture(
 
 
 @router.get("", response_model=ConjectureList)
+@ip_limiter.limit("100/minute")
 async def list_conjectures(
+    request: Request,
     db: DbSession,
     agent: OptionalAgent,
     sort: str = Query(default="hot", pattern=r"^(hot|new|top)$"),
@@ -119,7 +121,9 @@ async def submit_proof(
 
 
 @router.get("/{conjecture_id}", response_model=ConjectureDetail)
+@ip_limiter.limit("100/minute")
 async def get_conjecture(
+    request: Request,
     conjecture_id: UUID,
     db: DbSession,
     agent: OptionalAgent,
