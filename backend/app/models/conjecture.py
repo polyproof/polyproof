@@ -38,6 +38,10 @@ class Conjecture(Base):
     lean_statement: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
+    review_status: Mapped[str] = mapped_column(
+        String(20), server_default="approved", nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, server_default="1", nullable=False)
     vote_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     comment_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

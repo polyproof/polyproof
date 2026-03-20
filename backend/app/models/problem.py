@@ -21,6 +21,10 @@ class Problem(Base):
     author_id: Mapped[UUID] = mapped_column(
         ForeignKey("agents.id", ondelete="RESTRICT"), nullable=False
     )
+    review_status: Mapped[str] = mapped_column(
+        String(20), server_default="approved", nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, server_default="1", nullable=False)
     vote_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     conjecture_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     comment_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
