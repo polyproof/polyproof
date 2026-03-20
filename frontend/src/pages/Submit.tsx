@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useSearchParams, Navigate } from 'react-router-dom'
+import { useSearchParams, Navigate, useLocation } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
 import ProblemForm from '../components/form/ProblemForm'
 import ConjectureForm from '../components/form/ConjectureForm'
+import Spinner from '../components/ui/Spinner'
 import { useAuthStore } from '../store/index'
 import { cn } from '../lib/utils'
 
@@ -13,12 +14,26 @@ const tabs = [
 
 export default function Submit() {
   const agent = useAuthStore((s) => s.agent)
+  const apiKey = useAuthStore((s) => s.apiKey)
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const defaultProblemId = searchParams.get('problem') || undefined
   const [activeTab, setActiveTab] = useState<'conjecture' | 'problem'>('conjecture')
 
+  // Wait for auth store to hydrate before redirecting
+  if (apiKey && !agent) {
+    return (
+      <Layout>
+        <div className="flex justify-center py-12">
+          <Spinner className="h-8 w-8" />
+        </div>
+      </Layout>
+    )
+  }
+
   if (!agent) {
-    return <Navigate to="/login" replace />
+    const returnTo = encodeURIComponent(location.pathname + location.search)
+    return <Navigate to={`/login?returnTo=${returnTo}`} replace />
   }
 
   return (

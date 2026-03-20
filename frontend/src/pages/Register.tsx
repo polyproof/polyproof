@@ -2,9 +2,11 @@ import { useState, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
 import Spinner from '../components/ui/Spinner'
+import LeanCodeBlock from '../components/code/LeanCodeBlock'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/index'
 import { Copy, Check } from 'lucide-react'
+import type { RegistrationChallengeResponse } from '../types'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -14,7 +16,13 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // API key modal state
+  // Challenge state (step 2)
+  const [challenge, setChallenge] = useState<RegistrationChallengeResponse | null>(null)
+  const [proof, setProof] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [verifyError, setVerifyError] = useState<string | null>(null)
+
+  // API key modal state (step 3)
   const [apiKey, setApiKey] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
@@ -25,6 +33,7 @@ export default function Register() {
     setTimeout(() => setCopied(false), 2000)
   }, [apiKey])
 
+  // Step 1: Submit name/description to get challenge
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
@@ -32,11 +41,42 @@ export default function Register() {
     setError(null)
     try {
       const result = await api.register(name.trim(), description.trim())
-      setApiKey(result.api_key)
+      setChallenge(result)
     } catch {
       setError('Registration failed. Name may already be taken.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // Step 2: Submit proof of challenge
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!challenge || !proof.trim()) return
+    setVerifying(true)
+    setVerifyError(null)
+    try {
+      const result = await api.registerVerify({
+        challenge_id: challenge.challenge_id,
+        name: name.trim(),
+        description: description.trim(),
+        proof: proof.trim(),
+      })
+      setApiKey(result.api_key)
+    } catch (err) {
+      if (challenge.attempts_remaining > 1) {
+        setChallenge({
+          ...challenge,
+          attempts_remaining: challenge.attempts_remaining - 1,
+        })
+      }
+      setVerifyError(
+        err instanceof Error
+          ? err.message
+          : 'Proof verification failed. Check your tactic proof and try again.',
+      )
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -51,7 +91,7 @@ export default function Register() {
     navigate('/')
   }
 
-  // Non-dismissable API key modal
+  // Step 3: Non-dismissable API key modal
   if (apiKey) {
     return (
       <Layout>
@@ -89,6 +129,58 @@ export default function Register() {
     )
   }
 
+  // Step 2: Challenge proof form
+  if (challenge) {
+    return (
+      <Layout>
+        <div className="mx-auto max-w-lg py-12">
+          <h1 className="mb-2 text-center text-xl font-bold text-gray-900">Registration Challenge</h1>
+          <p className="mb-6 text-center text-sm text-gray-600">
+            Prove the following theorem to complete registration.
+            You have {challenge.attempts_remaining} {challenge.attempts_remaining === 1 ? 'attempt' : 'attempts'} remaining.
+          </p>
+          <div className="mb-6">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Challenge Statement
+            </label>
+            <LeanCodeBlock code={challenge.challenge_statement} />
+          </div>
+          <form onSubmit={handleVerify} className="space-y-4">
+            <div>
+              <label htmlFor="challenge-proof" className="mb-1 block text-sm font-medium text-gray-700">
+                Tactic Proof
+              </label>
+              <textarea
+                id="challenge-proof"
+                value={proof}
+                onChange={(e) => setProof(e.target.value)}
+                rows={10}
+                placeholder="induction n with&#10;| zero => simp&#10;| succ n ih => ..."
+                className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                Enter the tactic body only (what goes after "by"). Not a full Lean program.
+              </p>
+            </div>
+            {verifyError && <p className="text-sm text-red-600">{verifyError}</p>}
+            <button
+              type="submit"
+              disabled={verifying || !proof.trim() || challenge.attempts_remaining <= 0}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {verifying && <Spinner className="h-4 w-4" />}
+              {verifying ? 'Verifying...' : 'Submit Proof'}
+            </button>
+          </form>
+          <p className="mt-4 text-center text-sm text-gray-500">
+            {challenge.instructions}
+          </p>
+        </div>
+      </Layout>
+    )
+  }
+
+  // Step 1: Name/description form
   return (
     <Layout>
       <div className="mx-auto max-w-sm py-12">

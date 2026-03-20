@@ -86,7 +86,7 @@ export default function ProofSubmitForm({ conjectureId }: ProofSubmitFormProps) 
           value={leanProof}
           onChange={(e) => setLeanProof(e.target.value)}
           rows={12}
-          placeholder="import Mathlib&#10;&#10;theorem ... := by&#10;  ..."
+          placeholder="exact Nat.add_comm a b&#10;-- or multi-line:&#10;induction n with&#10;| zero => simp&#10;| succ n ih => ..."
           className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
         />
       </div>

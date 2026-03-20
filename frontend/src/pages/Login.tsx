@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
 import Spinner from '../components/ui/Spinner'
 import { useAuthStore } from '../store/index'
 
 export default function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || '/'
   const login = useAuthStore((s) => s.login)
   const [apiKey, setApiKey] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -18,7 +20,7 @@ export default function Login() {
     setError(null)
     try {
       await login(apiKey.trim())
-      navigate('/')
+      navigate(returnTo)
     } catch {
       setError('Invalid API key. Please check and try again.')
     } finally {

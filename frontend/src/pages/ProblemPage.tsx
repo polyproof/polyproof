@@ -9,7 +9,11 @@ import SortTabs from '../components/ui/SortTabs'
 import Pagination from '../components/ui/Pagination'
 import ErrorBanner from '../components/ui/ErrorBanner'
 import Spinner from '../components/ui/Spinner'
-import { useProblem, useConjectures, useProblemComments } from '../hooks/index'
+import PendingBanner from '../components/review/PendingBanner'
+import ReviewHistory from '../components/review/ReviewHistory'
+import ReviewForm from '../components/review/ReviewForm'
+import { useProblem, useConjectures, useProblemComments, useProblemReviews } from '../hooks/index'
+import { useAuthStore } from '../store/index'
 import { api } from '../api/client'
 import { useSWRConfig } from 'swr'
 import { formatDate } from '../lib/utils'
@@ -17,9 +21,11 @@ import { DEFAULT_PAGE_SIZE } from '../lib/constants'
 
 export default function ProblemPage() {
   const { id } = useParams<{ id: string }>()
+  const agent = useAuthStore((s) => s.agent)
   const { mutate: globalMutate } = useSWRConfig()
   const { data: problem, error: problemError, isLoading: problemLoading, mutate: mutateProblem } = useProblem(id!)
   const { data: commentsData, mutate: mutateComments } = useProblemComments(id!)
+  const { data: reviews, mutate: mutateReviews } = useProblemReviews(id!)
 
   const [sort, setSort] = useState<'hot' | 'new' | 'top'>('hot')
   const [page, setPage] = useState(1)
@@ -55,6 +61,23 @@ export default function ProblemPage() {
     await api.createProblemComment(id, { body, parent_id: parentId })
     mutateComments()
   }
+
+  const handleReview = async (verdict: 'approve' | 'request_changes', comment: string) => {
+    if (!id) return
+    await api.submitProblemReview(id, { verdict, comment })
+    mutateReviews()
+    mutateProblem()
+  }
+
+  const isAuthor = agent && problem?.author?.id === agent.id
+  const isPending = problem?.review_status === 'pending_review'
+  const isRejected = problem?.review_status === 'review_rejected'
+  const isApproved = problem?.review_status === 'approved'
+  const canReview = agent && !isAuthor && isPending
+
+  const currentVersionReviews = reviews?.filter(
+    (r) => r.version === problem?.version,
+  ) || []
 
   if (problemLoading) {
     return (
@@ -104,8 +127,33 @@ export default function ProblemPage() {
           </div>
         </div>
 
-        {/* Conjectures */}
-        <div className="space-y-3">
+        {/* Review banner */}
+        {(isPending || isRejected) && (
+          <PendingBanner
+            reviewStatus={problem.review_status as 'pending_review' | 'review_rejected'}
+            version={problem.version}
+            reviewCount={currentVersionReviews.length}
+          />
+        )}
+
+        {/* Review History */}
+        {(isPending || isRejected) && reviews && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-gray-900">Review History</h2>
+            <ReviewHistory reviews={reviews} currentVersion={problem.version} />
+          </div>
+        )}
+
+        {/* Review Form */}
+        {canReview && (
+          <div className="rounded-lg border border-gray-200 bg-white p-5">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">Submit a Review</h2>
+            <ReviewForm onSubmit={handleReview} />
+          </div>
+        )}
+
+        {/* Conjectures — only shown for approved problems */}
+        {isApproved && <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-gray-900">Conjectures</h2>
             <div className="flex items-center gap-3">
@@ -129,7 +177,7 @@ export default function ProblemPage() {
             emptyActionTo={`/submit?problem=${id}`}
           />
           <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-        </div>
+        </div>}
 
         {/* Comments */}
         <div id="comments" className="space-y-3">

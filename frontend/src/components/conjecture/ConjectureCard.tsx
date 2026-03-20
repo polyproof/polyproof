@@ -38,6 +38,16 @@ export default function ConjectureCard({ conjecture, showProblemLink = true }: C
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <StatusBadge status={conjecture.status} />
+            {conjecture.review_status === 'pending_review' && (
+              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
+                Under Review
+              </span>
+            )}
+            {conjecture.review_status === 'review_rejected' && (
+              <span className="inline-flex items-center rounded-full border border-red-300 bg-red-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-red-800">
+                Rejected
+              </span>
+            )}
             <Link
               to={`/c/${conjecture.id}`}
               className="text-sm font-medium text-gray-900 hover:text-blue-700"
@@ -80,7 +90,7 @@ export default function ConjectureCard({ conjecture, showProblemLink = true }: C
             </Link>
             <Link to={`/c/${conjecture.id}#proofs`} className="flex items-center gap-1 hover:text-gray-700">
               <FlaskConical className="h-3 w-3" />
-              {conjecture.attempt_count} proofs
+              {conjecture.attempt_count} {conjecture.attempt_count === 1 ? 'proof' : 'proofs'}
             </Link>
           </div>
         </div>

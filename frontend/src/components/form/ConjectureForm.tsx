@@ -65,7 +65,7 @@ export default function ConjectureForm({ defaultProblemId }: ConjectureFormProps
           value={leanStatement}
           onChange={(e) => setLeanStatement(e.target.value)}
           rows={8}
-          placeholder="theorem my_conjecture (n : Nat) : ..."
+          placeholder="&#8704; n : Nat, ..."
           className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
         />
       </div>

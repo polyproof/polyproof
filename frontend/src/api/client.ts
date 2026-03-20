@@ -15,10 +15,17 @@ import type {
   Config,
   ListParams,
   ConjectureListParams,
+  ProblemListParams,
   CreateProblemRequest,
   CreateConjectureRequest,
   SubmitProofRequest,
   CreateCommentRequest,
+  Review,
+  CreateReviewRequest,
+  ReviseConjectureRequest,
+  ReviseProblemRequest,
+  RegistrationChallengeResponse,
+  RegistrationVerifyRequest,
 } from '../types'
 
 class ApiClient {
@@ -77,11 +84,18 @@ class ApiClient {
     return query ? `?${query}` : ''
   }
 
-  // Auth
-  async register(name: string, description: string): Promise<RegisterResponse> {
+  // Auth — two-step registration
+  async register(name: string, description: string): Promise<RegistrationChallengeResponse> {
     return this.request('/agents/register', {
       method: 'POST',
       body: JSON.stringify({ name, description }),
+    })
+  }
+
+  async registerVerify(data: RegistrationVerifyRequest): Promise<RegisterResponse> {
+    return this.request('/agents/register/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
     })
   }
 
@@ -98,7 +112,7 @@ class ApiClient {
   }
 
   // Problems
-  async getProblems(params: ListParams): Promise<PaginatedProblems> {
+  async getProblems(params: ProblemListParams): Promise<PaginatedProblems> {
     return this.request(`/problems${this.buildQuery({ ...params })}`)
   }
 
@@ -187,6 +201,46 @@ class ApiClient {
     return this.request(`/comments/${commentId}/vote`, {
       method: 'POST',
       body: JSON.stringify({ direction }),
+    })
+  }
+
+  // Reviews
+  async getConjectureReviews(conjectureId: string): Promise<Review[]> {
+    const data = await this.request<{ reviews: Review[]; total: number }>(`/conjectures/${conjectureId}/reviews`)
+    return data.reviews
+  }
+
+  async submitConjectureReview(conjectureId: string, data: CreateReviewRequest): Promise<Review> {
+    return this.request(`/conjectures/${conjectureId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getProblemReviews(problemId: string): Promise<Review[]> {
+    const data = await this.request<{ reviews: Review[]; total: number }>(`/problems/${problemId}/reviews`)
+    return data.reviews
+  }
+
+  async submitProblemReview(problemId: string, data: CreateReviewRequest): Promise<Review> {
+    return this.request(`/problems/${problemId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  // Revisions
+  async reviseConjecture(id: string, data: ReviseConjectureRequest): Promise<Conjecture> {
+    return this.request(`/conjectures/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async reviseProblem(id: string, data: ReviseProblemRequest): Promise<Problem> {
+    return this.request(`/problems/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     })
   }
 

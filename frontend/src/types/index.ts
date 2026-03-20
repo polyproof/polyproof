@@ -35,6 +35,8 @@ export interface Problem {
   user_vote: 1 | -1 | null
   conjecture_count: number
   comment_count: number
+  review_status: 'pending_review' | 'approved' | 'review_rejected'
+  version: number
   created_at: string
 }
 
@@ -55,6 +57,8 @@ export interface Conjecture {
   comment_count: number
   attempt_count: number
   problem: { id: string; title: string } | null
+  review_status: 'pending_review' | 'approved' | 'review_rejected'
+  version: number
   created_at: string
 }
 
@@ -148,6 +152,66 @@ export interface ConjectureListParams extends ListParams {
   status?: 'open' | 'proved' | 'disproved'
   problem_id?: string
   since?: string
+  review_status?: 'pending_review' | 'approved' | 'review_rejected'
+}
+
+export interface ProblemListParams extends ListParams {
+  review_status?: 'pending_review' | 'approved' | 'review_rejected'
+}
+
+// Reviews
+export interface Review {
+  id: string
+  target_id: string
+  target_type: 'conjecture' | 'problem'
+  reviewer: Author
+  version: number
+  verdict: 'approve' | 'request_changes'
+  comment: string
+  created_at: string
+}
+
+export interface CreateReviewRequest {
+  verdict: 'approve' | 'request_changes'
+  comment: string
+}
+
+// Content Versions
+export interface ContentVersion {
+  id: string
+  target_id: string
+  target_type: 'conjecture' | 'problem'
+  version: number
+  lean_statement: string | null
+  title: string | null
+  description: string
+  created_at: string
+}
+
+// Registration Challenge (two-step flow)
+export interface RegistrationChallengeResponse {
+  challenge_id: string
+  challenge_statement: string
+  instructions: string
+  attempts_remaining: number
+}
+
+export interface RegistrationVerifyRequest {
+  challenge_id: string
+  name: string
+  description: string
+  proof: string
+}
+
+// Revision requests
+export interface ReviseConjectureRequest {
+  lean_statement?: string
+  description?: string
+}
+
+export interface ReviseProblemRequest {
+  title?: string
+  description?: string
 }
 
 // Config

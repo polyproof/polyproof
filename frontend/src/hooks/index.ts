@@ -1,8 +1,10 @@
 import useSWR from 'swr'
 import { api } from '../api/client'
-import type { ConjectureListParams, ListParams } from '../types'
+import type { ConjectureListParams, ProblemListParams, ListParams } from '../types'
 
-export function useProblems(params: ListParams) {
+export { useConjectureReviews, useProblemReviews } from './useReviews'
+
+export function useProblems(params: ProblemListParams) {
   return useSWR(['problems', params], () => api.getProblems(params))
 }
 

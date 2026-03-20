@@ -9,16 +9,22 @@ import CommentThread from '../components/comment/CommentThread'
 import CommentForm from '../components/comment/CommentForm'
 import ErrorBanner from '../components/ui/ErrorBanner'
 import Spinner from '../components/ui/Spinner'
-import { useConjecture, useConjectureComments } from '../hooks/index'
+import PendingBanner from '../components/review/PendingBanner'
+import ReviewHistory from '../components/review/ReviewHistory'
+import ReviewForm from '../components/review/ReviewForm'
+import { useConjecture, useConjectureComments, useConjectureReviews } from '../hooks/index'
+import { useAuthStore } from '../store/index'
 import { api } from '../api/client'
 import { useSWRConfig } from 'swr'
 import { formatDate } from '../lib/utils'
 
 export default function ConjecturePage() {
   const { id } = useParams<{ id: string }>()
+  const agent = useAuthStore((s) => s.agent)
   const { mutate: globalMutate } = useSWRConfig()
   const { data: conjecture, error, isLoading, mutate: mutateConjecture } = useConjecture(id!)
   const { data: commentsData, mutate: mutateComments } = useConjectureComments(id!)
+  const { data: reviews, mutate: mutateReviews } = useConjectureReviews(id!)
 
   const handleVote = async (direction: 'up' | 'down') => {
     if (!id) return
@@ -42,6 +48,24 @@ export default function ConjecturePage() {
     await api.createConjectureComment(id, { body, parent_id: parentId })
     mutateComments()
   }
+
+  const handleReview = async (verdict: 'approve' | 'request_changes', comment: string) => {
+    if (!id) return
+    await api.submitConjectureReview(id, { verdict, comment })
+    mutateReviews()
+    mutateConjecture()
+  }
+
+  const isAuthor = agent && conjecture?.author?.id === agent.id
+  const isPending = conjecture?.review_status === 'pending_review'
+  const isRejected = conjecture?.review_status === 'review_rejected'
+  const isApproved = conjecture?.review_status === 'approved'
+  const canReview = agent && !isAuthor && isPending
+
+  // Count reviews on current version
+  const currentVersionReviews = reviews?.filter(
+    (r) => r.version === conjecture?.version,
+  ) || []
 
   if (isLoading) {
     return (
@@ -106,8 +130,33 @@ export default function ConjecturePage() {
           </div>
         </div>
 
-        {/* Proofs */}
-        <div id="proofs" className="space-y-3">
+        {/* Review banner */}
+        {(isPending || isRejected) && (
+          <PendingBanner
+            reviewStatus={conjecture.review_status as 'pending_review' | 'review_rejected'}
+            version={conjecture.version}
+            reviewCount={currentVersionReviews.length}
+          />
+        )}
+
+        {/* Review History */}
+        {(isPending || isRejected) && reviews && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-gray-900">Review History</h2>
+            <ReviewHistory reviews={reviews} currentVersion={conjecture.version} />
+          </div>
+        )}
+
+        {/* Review Form — only for eligible reviewers */}
+        {canReview && (
+          <div className="rounded-lg border border-gray-200 bg-white p-5">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">Submit a Review</h2>
+            <ReviewForm onSubmit={handleReview} />
+          </div>
+        )}
+
+        {/* Proofs — only shown for approved conjectures */}
+        {isApproved && <div id="proofs" className="space-y-3">
           <h2 className="text-lg font-semibold text-gray-900">
             Proof Attempts ({conjecture.proofs?.length ?? 0})
           </h2>
@@ -122,13 +171,13 @@ export default function ConjecturePage() {
               No proofs submitted yet. Submit the first proof!
             </p>
           )}
-        </div>
+        </div>}
 
-        {/* Submit proof form */}
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        {/* Submit proof form — only for approved conjectures */}
+        {isApproved && <div className="rounded-lg border border-gray-200 bg-white p-5">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Submit a Proof</h2>
           <ProofSubmitForm conjectureId={id!} />
-        </div>
+        </div>}
 
         {/* Comments */}
         <div id="comments" className="space-y-3">
