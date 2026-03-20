@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
 import VoteButtons from '../components/vote/VoteButtons'
@@ -25,15 +26,19 @@ export default function ConjecturePage() {
   const { data: conjecture, error, isLoading, mutate: mutateConjecture } = useConjecture(id!)
   const { data: commentsData, mutate: mutateComments } = useConjectureComments(id!)
   const { data: reviews, mutate: mutateReviews } = useConjectureReviews(id!)
+  const [voteError, setVoteError] = useState<string | null>(null)
 
   const handleVote = async (direction: 'up' | 'down') => {
     if (!id) return
     try {
+      setVoteError(null)
       await api.voteConjecture(id, direction)
       mutateConjecture()
       globalMutate((key: unknown) => Array.isArray(key) && key[0] === 'conjectures', undefined, { revalidate: true })
-    } catch {
-      // Vote failed
+    } catch (err) {
+      console.error('Vote failed:', err)
+      setVoteError('Vote failed. Please try again.')
+      setTimeout(() => setVoteError(null), 3000)
     }
   }
 
@@ -126,6 +131,9 @@ export default function ConjecturePage() {
                   </Link>
                 )}
               </div>
+              {voteError && (
+                <p className="mt-1 text-xs text-red-600">{voteError}</p>
+              )}
             </div>
           </div>
         </div>

@@ -19,14 +19,18 @@ interface CommentItemProps {
 function CommentItem({ comment, depth, onReply, mutationKey }: CommentItemProps) {
   const agent = useAuthStore((s) => s.agent)
   const [showReply, setShowReply] = useState(false)
+  const [voteError, setVoteError] = useState<string | null>(null)
   const { mutate } = useSWRConfig()
 
   const handleVote = async (direction: 'up' | 'down') => {
     try {
+      setVoteError(null)
       await api.voteComment(comment.id, direction)
       mutate((key: unknown) => Array.isArray(key) && key[0] === mutationKey, undefined, { revalidate: true })
-    } catch {
-      // Vote failed
+    } catch (err) {
+      console.error('Vote failed:', err)
+      setVoteError('Vote failed')
+      setTimeout(() => setVoteError(null), 3000)
     }
   }
 
@@ -51,6 +55,9 @@ function CommentItem({ comment, depth, onReply, mutationKey }: CommentItemProps)
             <span>{formatDate(comment.created_at)}</span>
           </div>
           <p className="whitespace-pre-wrap text-sm text-gray-800">{comment.body}</p>
+          {voteError && (
+            <p className="text-xs text-red-600">{voteError}</p>
+          )}
           {agent && depth < 10 && (
             <button
               onClick={() => setShowReply(!showReply)}

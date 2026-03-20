@@ -14,14 +14,14 @@ const tabs = [
 
 export default function Submit() {
   const agent = useAuthStore((s) => s.agent)
-  const apiKey = useAuthStore((s) => s.apiKey)
+  const isHydrating = useAuthStore((s) => s.isHydrating)
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const defaultProblemId = searchParams.get('problem') || undefined
   const [activeTab, setActiveTab] = useState<'conjecture' | 'problem'>('conjecture')
 
   // Wait for auth store to hydrate before redirecting
-  if (apiKey && !agent) {
+  if (isHydrating) {
     return (
       <Layout>
         <div className="flex justify-center py-12">

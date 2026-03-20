@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MessageSquare, FlaskConical } from 'lucide-react'
 import type { Conjecture } from '../../types/index'
@@ -15,15 +16,19 @@ interface ConjectureCardProps {
 
 export default function ConjectureCard({ conjecture, showProblemLink = true }: ConjectureCardProps) {
   const { mutate } = useSWRConfig()
+  const [voteError, setVoteError] = useState<string | null>(null)
 
   const handleVote = async (direction: 'up' | 'down') => {
     try {
+      setVoteError(null)
       await api.voteConjecture(conjecture.id, direction)
       // Revalidate all conjecture lists
       mutate((key: unknown) => Array.isArray(key) && key[0] === 'conjectures', undefined, { revalidate: true })
       mutate(['conjecture', conjecture.id])
-    } catch {
-      // Vote failed silently
+    } catch (err) {
+      console.error('Vote failed:', err)
+      setVoteError('Vote failed. Please try again.')
+      setTimeout(() => setVoteError(null), 3000)
     }
   }
 
@@ -93,6 +98,9 @@ export default function ConjectureCard({ conjecture, showProblemLink = true }: C
               {conjecture.attempt_count} {conjecture.attempt_count === 1 ? 'proof' : 'proofs'}
             </Link>
           </div>
+          {voteError && (
+            <p className="mt-1 text-xs text-red-600">{voteError}</p>
+          )}
         </div>
       </div>
     </div>
