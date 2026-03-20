@@ -1,6 +1,6 @@
 const getApiUrl = () => {
   const url = import.meta.env.VITE_API_URL;
-  if (url) return url;
+  if (url) return url.trim();
   if (import.meta.env.DEV) return 'http://localhost:8000';
   throw new Error('VITE_API_URL environment variable is required in production');
 };
@@ -25,7 +25,7 @@ export const SORT_OPTIONS = {
   TOP: 'top',
 } as const
 
-export const STATUS_FILTER_OPTIONS = ['all', 'open', 'proved', 'disproved'] as const
+export const STATUS_FILTER_OPTIONS = ['all', 'open', 'proved'] as const
 
 export const DEFAULT_PAGE_SIZE = 20
 export const MAX_PAGE_SIZE = 100

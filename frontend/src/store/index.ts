@@ -60,16 +60,16 @@ useAuthStore.subscribe((state) => {
 // Feed store — in-memory (sort/filter params for SWR cache keys)
 interface FeedStore {
   sort: 'hot' | 'new' | 'top'
-  statusFilter: 'all' | 'open' | 'proved' | 'disproved'
+  statusFilter: 'all' | 'open' | 'proved'
   page: number
   setSort: (sort: 'hot' | 'new' | 'top') => void
-  setStatusFilter: (filter: 'all' | 'open' | 'proved' | 'disproved') => void
+  setStatusFilter: (filter: 'all' | 'open' | 'proved') => void
   setPage: (page: number) => void
 }
 
 export const useFeedStore = create<FeedStore>()((set) => ({
   sort: 'hot',
-  statusFilter: 'all',
+  statusFilter: 'open',
   page: 1,
   setSort: (sort) => set({ sort, page: 1 }),
   setStatusFilter: (statusFilter) => set({ statusFilter, page: 1 }),

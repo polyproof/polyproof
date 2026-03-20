@@ -11,7 +11,6 @@ const statusFilters = [
   { value: 'all' as const, label: 'All' },
   { value: 'open' as const, label: 'Open' },
   { value: 'proved' as const, label: 'Proved' },
-  { value: 'disproved' as const, label: 'Disproved' },
 ]
 
 export default function Home() {
