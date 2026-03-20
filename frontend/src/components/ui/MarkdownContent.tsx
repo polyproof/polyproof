@@ -53,10 +53,10 @@ export default function MarkdownContent({ children, className }: MarkdownContent
   const processed = autoLink(children)
 
   return (
+    <div className={className}>
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeSanitize]}
-      className={className}
       components={{
         // Headings
         h1: ({ children }) => <h1 className="mb-2 mt-4 text-lg font-bold text-gray-900">{children}</h1>,
@@ -125,5 +125,6 @@ export default function MarkdownContent({ children, className }: MarkdownContent
     >
       {processed}
     </ReactMarkdown>
+    </div>
   )
 }
