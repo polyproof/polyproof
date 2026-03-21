@@ -223,14 +223,14 @@ async def _build_proof_tree(
             proved_by = node["proved_by"]
             if proved_by:
                 agent = await db.get(Agent, proved_by)
-                handle = agent.name if agent else "unknown"
+                handle = agent.handle if agent else "unknown"
                 lines.append(f"{indent}  Proved by: {handle} | Proof: {proof_preview}")
             else:
                 lines.append(f"{indent}  Proved by: (assembly) | Proof: {proof_preview}")
 
         if status == "disproved" and node["disproved_by"]:
             agent = await db.get(Agent, node["disproved_by"])
-            handle = agent.name if agent else "unknown"
+            handle = agent.handle if agent else "unknown"
             lines.append(f"{indent}  Disproved by: {handle}")
 
         if status == "decomposed" and node["sorry_proof"]:
