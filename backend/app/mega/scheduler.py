@@ -94,6 +94,11 @@ async def check_triggers(project_id: UUID) -> None:
             )
             return
 
+        # Cooldown: don't invoke if last invocation was too recent
+        seconds_since = (datetime.now(UTC) - last_invocation).total_seconds()
+        if seconds_since < settings.MEGA_AGENT_COOLDOWN:
+            return
+
         # Trigger 2: activity_threshold
         activity_count = await _count_activity_since(project_id, last_invocation, db)
         if activity_count >= ACTIVITY_THRESHOLD:
@@ -108,7 +113,7 @@ async def check_triggers(project_id: UUID) -> None:
             return
 
         # Trigger 3: periodic_heartbeat (24+ hours since last invocation)
-        hours_since = (datetime.now(UTC) - last_invocation).total_seconds() / 3600
+        hours_since = seconds_since / 3600
         if hours_since >= HEARTBEAT_HOURS:
             await _invoke_mega_agent(
                 project_id,

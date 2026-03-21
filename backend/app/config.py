@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     LEAN_SERVER_URL: str = "http://localhost:8000"
     LEAN_SERVER_SECRET: str = ""
     OPENAI_API_KEY: str = ""
-    ACTIVITY_THRESHOLD: int = 5
+    ACTIVITY_THRESHOLD: int = 200
+    MEGA_AGENT_COOLDOWN: int = 3600  # minimum seconds between invocations per project
     ADMIN_API_KEY: str = ""
     RATE_LIMIT_ENABLED: bool = True
     API_BASE_URL: str = "https://api.polyproof.org"
