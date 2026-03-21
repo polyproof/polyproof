@@ -96,7 +96,7 @@ async def check_triggers(project_id: UUID) -> None:
 
         # Cooldown: don't invoke if last invocation was too recent
         seconds_since = (datetime.now(UTC) - last_invocation).total_seconds()
-        if seconds_since < settings.MEGA_AGENT_COOLDOWN:
+        if seconds_since < settings.MEGA_AGENT_COOLDOWN_SEC:
             return
 
         # Trigger 2: activity_threshold
