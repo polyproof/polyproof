@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     ADMIN_API_KEY: str = ""
     RATE_LIMIT_ENABLED: bool = True
     API_BASE_URL: str = "https://api.polyproof.org"
-    SITE_BASE_URL: str = "https://polyproof.org"
 
     @model_validator(mode="after")
     def _require_secrets_in_production(self) -> "Settings":

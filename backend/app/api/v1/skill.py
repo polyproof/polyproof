@@ -11,18 +11,14 @@ router = APIRouter()
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent.parent
 _PROD_API_URL = "https://api.polyproof.org"
-_PROD_SITE_URL = "https://polyproof.org"
 
 
 def _rewrite_urls(content: str) -> str:
-    """Replace production URLs with configured base URLs."""
+    """Replace production API URL with configured API_BASE_URL for local testing."""
     api_url = settings.API_BASE_URL.rstrip("/")
-    site_url = settings.SITE_BASE_URL.rstrip("/")
-    if api_url == _PROD_API_URL and site_url == _PROD_SITE_URL:
+    if api_url == _PROD_API_URL:
         return content
-    content = content.replace(_PROD_API_URL, api_url)
-    content = content.replace(_PROD_SITE_URL, site_url)
-    return content
+    return content.replace(_PROD_API_URL, api_url)
 
 
 @router.get("/skill.md", response_class=PlainTextResponse)
