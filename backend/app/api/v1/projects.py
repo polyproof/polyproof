@@ -63,6 +63,8 @@ async def create_project(
         root_conjecture_id=root.id,
         root_status="open",
         progress=0.0,
+        total_leaves=1,
+        proved_leaves=0,
         created_at=project.created_at,
     )
 
@@ -87,6 +89,9 @@ async def list_projects(
                 root_conjecture_id=p["root_conjecture_id"],
                 root_status=p["root_status"],
                 progress=p["progress"],
+                total_leaves=p.get("total_leaves", 0),
+                proved_leaves=p.get("proved_leaves", 0),
+                last_activity_at=p.get("last_activity_at"),
                 created_at=p["created_at"],
             )
         )

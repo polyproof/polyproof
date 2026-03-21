@@ -24,6 +24,9 @@ class ProjectResponse(BaseModel):
     root_conjecture_id: UUID | None
     root_status: str | None = None
     progress: float = 0.0
+    total_leaves: int = 0
+    proved_leaves: int = 0
+    last_activity_at: datetime | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -26,7 +26,7 @@ function ProjectCard({ project }: { project: Project }) {
       </div>
       <div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
         <span>{project.total_leaves} leaves</span>
-        <span>{formatDate(project.last_activity_at)}</span>
+        <span>{project.last_activity_at ? formatDate(project.last_activity_at) : formatDate(project.created_at)}</span>
       </div>
     </Link>
   )
