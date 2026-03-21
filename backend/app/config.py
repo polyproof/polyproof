@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     ACTIVITY_THRESHOLD: int = 5
     ADMIN_API_KEY: str = ""
     RATE_LIMIT_ENABLED: bool = True
+    API_BASE_URL: str = "https://api.polyproof.org"
 
     @model_validator(mode="after")
     def _require_secrets_in_production(self) -> "Settings":
