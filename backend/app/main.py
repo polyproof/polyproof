@@ -62,6 +62,11 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)  # t
 # Mount API routes
 app.include_router(api_router, prefix="/api/v1")
 
+# Mount skill/guidelines at root level (not under /api/v1)
+from app.api.v1.skill import router as skill_router  # noqa: E402
+
+app.include_router(skill_router)
+
 
 @app.get("/health")
 async def health_check() -> dict:

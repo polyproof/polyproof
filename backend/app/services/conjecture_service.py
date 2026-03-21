@@ -1,305 +1,274 @@
-from datetime import datetime
+"""Conjecture tree queries and detail views."""
+
 from uuid import UUID
 
-from sqlalchemy import Integer, Select, cast, func, select, update
+from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import BadRequestError, ConflictError, NotFoundError
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.conjecture import Conjecture
-from app.models.problem import Problem
-from app.models.proof import Proof
-from app.models.vote import Vote
-from app.services import lean_client
-from app.services.comment_service import build_comment_tree
+from app.schemas.agent import AuthorResponse
 
 
-def _base_query(agent_id: UUID | None = None) -> Select:
-    """Build the base SELECT for conjectures with author, problem, and optional user_vote."""
-    stmt = (
-        select(
-            Conjecture,
-            Agent.id.label("author_id"),
-            Agent.name.label("author_name"),
-            Agent.reputation.label("author_reputation"),
-            Problem.id.label("problem_ref_id"),
-            Problem.title.label("problem_title"),
-        )
-        .join(Agent, Agent.id == Conjecture.author_id)
-        .outerjoin(Problem, Problem.id == Conjecture.problem_id)
+async def get_by_id(db: AsyncSession, conjecture_id: UUID) -> Conjecture | None:
+    """Get a conjecture by ID."""
+    return await db.get(Conjecture, conjecture_id)
+
+
+async def _build_author(db: AsyncSession, agent_id: UUID | None) -> AuthorResponse | None:
+    """Build an AuthorResponse from an agent ID."""
+    if agent_id is None:
+        return None
+    agent = await db.get(Agent, agent_id)
+    if agent is None:
+        return None
+    return AuthorResponse(
+        id=agent.id,
+        handle=agent.handle,
+        type=agent.type,
+        conjectures_proved=agent.conjectures_proved,
     )
-    if agent_id is not None:
-        stmt = stmt.outerjoin(
-            Vote,
-            (Vote.target_id == Conjecture.id)
-            & (Vote.target_type == "conjecture")
-            & (Vote.agent_id == agent_id),
-        ).add_columns(Vote.value.label("user_vote"))
-    else:
-        stmt = stmt.add_columns(cast(None, Integer).label("user_vote"))
-    return stmt
 
 
-def _apply_sort(stmt: Select, sort: str) -> Select:
-    """Apply sort ordering to the query."""
-    if sort == "new":
-        return stmt.order_by(Conjecture.created_at.desc())
-    if sort == "top":
-        return stmt.order_by(Conjecture.vote_count.desc(), Conjecture.created_at.desc())
-    # hot (default)
-    hot_score = (
-        func.log(func.greatest(func.abs(Conjecture.vote_count), 1))
-        * func.sign(Conjecture.vote_count)
-        + func.extract("epoch", Conjecture.created_at) / 45000
+async def get_comment_count(db: AsyncSession, conjecture_id: UUID) -> int:
+    """Count comments for a conjecture."""
+    result = await db.scalar(
+        select(func.count()).select_from(Comment).where(Comment.conjecture_id == conjecture_id)
     )
-    return stmt.order_by(hot_score.desc())
+    return result or 0
 
 
-def _row_to_dict(row) -> dict:
-    """Convert a query row to a conjecture response dict."""
-    conjecture = row[0]
-    problem_ref = None
-    if row.problem_ref_id is not None:
-        problem_ref = {"id": row.problem_ref_id, "title": row.problem_title}
-    return {
-        "id": conjecture.id,
-        "lean_statement": conjecture.lean_statement,
-        "description": conjecture.description,
-        "status": conjecture.status,
-        "review_status": conjecture.review_status,
-        "version": conjecture.version,
-        "author": {
-            "id": row.author_id,
-            "name": row.author_name,
-            "reputation": row.author_reputation,
-        },
-        "vote_count": conjecture.vote_count,
-        "user_vote": row.user_vote,
-        "comment_count": conjecture.comment_count,
-        "attempt_count": conjecture.attempt_count,
-        "problem": problem_ref,
-        "created_at": conjecture.created_at,
-    }
+async def get_parent_chain(db: AsyncSession, conjecture: Conjecture) -> list[dict]:
+    """Get the ancestor chain from root to immediate parent.
 
-
-async def create(
-    db: AsyncSession,
-    lean_statement: str,
-    description: str,
-    author: Agent,
-    problem_id: UUID | None = None,
-) -> Conjecture:
-    """Create a new conjecture. Typechecks lean_statement via Lean CI before saving.
-
-    The lean_statement should be a Lean type (proposition), not a complete theorem.
-    We wrap it as `theorem _check : <statement> := by sorry` to validate the type
-    is well-formed without requiring a proof.
+    Returns list ordered root-first, excluding the conjecture itself.
     """
-    # Exact dedup: normalize whitespace and check for existing match
-    normalized = " ".join(lean_statement.split())
-    existing = await db.scalar(
-        select(Conjecture.id)
-        .where(
-            func.btrim(func.regexp_replace(Conjecture.lean_statement, r"\s+", " ", "g"))
-            == normalized
+    if conjecture.parent_id is None:
+        return []
+
+    query = text("""
+        WITH RECURSIVE ancestors AS (
+            SELECT id, parent_id, lean_statement, description, status, 0 AS depth
+            FROM conjectures
+            WHERE id = :start_id
+
+            UNION ALL
+
+            SELECT c.id, c.parent_id, c.lean_statement, c.description, c.status, a.depth + 1
+            FROM conjectures c
+            JOIN ancestors a ON c.id = a.parent_id
         )
-        .limit(1)
+        SELECT id, lean_statement, description, status
+        FROM ancestors
+        WHERE id != :self_id
+        ORDER BY depth DESC
+    """)
+    result = await db.execute(
+        query, {"start_id": str(conjecture.parent_id), "self_id": str(conjecture.id)}
     )
-    if existing:
-        raise ConflictError(f"This lean_statement already exists as conjecture {existing}")
-
-    result = await lean_client.typecheck(lean_statement)
-    if result.status != "passed":
-        raise BadRequestError(f"Invalid Lean statement: {result.error or result.status}")
-
-    # Reject trivially provable statements
-    if await lean_client.triviality_check(lean_statement):
-        raise BadRequestError(
-            "This statement is automatically provable by standard tactics "
-            "(decide/simp/omega/norm_num/ring). "
-            "Consider posting something that requires a non-trivial proof."
-        )
-
-    # Validate problem exists and is approved if provided
-    if problem_id is not None:
-        problem = await db.get(Problem, problem_id)
-        if not problem:
-            raise NotFoundError("Problem", f"No problem with id {problem_id}")
-        if problem.review_status != "approved":
-            raise BadRequestError("Conjectures can only be submitted under approved problems")
-
-    # Admin submissions are auto-approved; all others go through review
-    review_status = "approved" if author.name == "polyproof_admin" else "pending_review"
-
-    conjecture = Conjecture(
-        problem_id=problem_id,
-        author_id=author.id,
-        lean_statement=lean_statement,
-        description=description,
-        review_status=review_status,
-    )
-    db.add(conjecture)
-    await db.flush()
-
-    # Atomic counter updates
-    await db.execute(
-        update(Agent)
-        .where(Agent.id == author.id)
-        .values(conjecture_count=Agent.conjecture_count + 1)
-    )
-    if problem_id is not None:
-        await db.execute(
-            update(Problem)
-            .where(Problem.id == problem_id)
-            .values(conjecture_count=Problem.conjecture_count + 1)
-        )
-
-    await db.commit()
-    await db.refresh(conjecture)
-    conjecture.author = author  # type: ignore[assignment]
-    return conjecture
-
-
-async def list_conjectures(
-    db: AsyncSession,
-    sort: str = "hot",
-    status: str | None = None,
-    review_status: str | None = None,
-    problem_id: UUID | None = None,
-    author_id: UUID | None = None,
-    since: datetime | None = None,
-    q: str | None = None,
-    limit: int = 20,
-    offset: int = 0,
-    current_agent_id: UUID | None = None,
-) -> tuple[list[dict], int]:
-    """List conjectures with sorting, filtering, and pagination.
-
-    By default, only approved conjectures are shown. When review_status=pending_review
-    is requested, items authored by the requesting agent are excluded (no self-review).
-    """
-    stmt = _base_query(current_agent_id)
-
-    # Build count query in parallel
-    count_stmt = select(func.count()).select_from(Conjecture)
-
-    # Default to approved if no review_status filter specified
-    effective_review_status = review_status if review_status else "approved"
-    stmt = stmt.where(Conjecture.review_status == effective_review_status)
-    count_stmt = count_stmt.where(Conjecture.review_status == effective_review_status)
-
-    # When requesting pending_review, exclude own submissions (no self-review)
-    if effective_review_status == "pending_review" and current_agent_id is not None:
-        stmt = stmt.where(Conjecture.author_id != current_agent_id)
-        count_stmt = count_stmt.where(Conjecture.author_id != current_agent_id)
-
-    # review_rejected items are only visible to the author
-    if effective_review_status == "review_rejected":
-        if current_agent_id is None:
-            # Not authenticated — no rejected items visible
-            return [], 0
-        stmt = stmt.where(Conjecture.author_id == current_agent_id)
-        count_stmt = count_stmt.where(Conjecture.author_id == current_agent_id)
-
-    # Apply filters to both
-    if status:
-        stmt = stmt.where(Conjecture.status == status)
-        count_stmt = count_stmt.where(Conjecture.status == status)
-    if problem_id:
-        stmt = stmt.where(Conjecture.problem_id == problem_id)
-        count_stmt = count_stmt.where(Conjecture.problem_id == problem_id)
-    if author_id:
-        stmt = stmt.where(Conjecture.author_id == author_id)
-        count_stmt = count_stmt.where(Conjecture.author_id == author_id)
-    if since:
-        stmt = stmt.where(Conjecture.created_at > since)
-        count_stmt = count_stmt.where(Conjecture.created_at > since)
-    if q:
-        pattern = f"%{q}%"
-        q_filter = Conjecture.description.ilike(pattern) | Conjecture.lean_statement.ilike(pattern)
-        stmt = stmt.where(q_filter)
-        count_stmt = count_stmt.where(q_filter)
-
-    total = await db.scalar(count_stmt) or 0
-
-    stmt = _apply_sort(stmt, sort)
-    stmt = stmt.limit(limit).offset(offset)
-
-    result = await db.execute(stmt)
     rows = result.all()
-    items = [_row_to_dict(row) for row in rows]
+    return [
+        {
+            "id": row.id,
+            "lean_statement": row.lean_statement,
+            "description": row.description,
+            "status": row.status,
+        }
+        for row in rows
+    ]
 
-    return items, total
 
-
-async def get_by_id(
-    db: AsyncSession,
-    conjecture_id: UUID,
-    current_agent_id: UUID | None = None,
-) -> dict:
-    """Get a single conjecture by ID with author, problem, proofs, and comments stub."""
-    stmt = _base_query(current_agent_id).where(Conjecture.id == conjecture_id)
-    result = await db.execute(stmt)
-    row = result.first()
-    if not row:
-        raise NotFoundError("Conjecture", f"No conjecture with id {conjecture_id}")
-
-    data = _row_to_dict(row)
-
-    # review_rejected items are only visible to the author
-    if data["review_status"] == "review_rejected" and data["author"]["id"] != current_agent_id:
-        raise NotFoundError("Conjecture", f"No conjecture with id {conjecture_id}")
-
-    # Fetch proofs
-    proofs_stmt = (
-        select(
-            Proof,
-            Agent.id.label("proof_author_id"),
-            Agent.name.label("proof_author_name"),
-            Agent.reputation.label("proof_author_reputation"),
+async def get_children(db: AsyncSession, conjecture_id: UUID) -> list[dict]:
+    """Get direct children of a conjecture, excluding invalid ones."""
+    result = await db.execute(
+        select(Conjecture)
+        .where(
+            Conjecture.parent_id == conjecture_id,
+            Conjecture.status != "invalid",
         )
-        .join(Agent, Agent.id == Proof.author_id)
-        .where(Proof.conjecture_id == conjecture_id)
-        .order_by(Proof.created_at.asc())
+        .order_by(Conjecture.created_at.asc())
     )
-    proofs_result = await db.execute(proofs_stmt)
-    proofs = []
-    for proof_row in proofs_result.all():
-        proof = proof_row[0]
-        proofs.append(
+    children = result.scalars().all()
+    items = []
+    for c in children:
+        proved_by = await _build_author(db, c.proved_by)
+        items.append(
             {
-                "id": proof.id,
-                "lean_proof": proof.lean_proof,
-                "description": proof.description,
-                "verification_status": proof.verification_status,
-                "verification_error": proof.verification_error,
-                "author": {
-                    "id": proof_row.proof_author_id,
-                    "name": proof_row.proof_author_name,
-                    "reputation": proof_row.proof_author_reputation,
-                },
-                "created_at": proof.created_at,
+                "id": c.id,
+                "lean_statement": c.lean_statement,
+                "description": c.description,
+                "status": c.status,
+                "proof_lean": c.proof_lean,
+                "proved_by": proved_by,
+            }
+        )
+    return items
+
+
+async def get_proved_siblings(db: AsyncSession, conjecture: Conjecture) -> list[dict]:
+    """Get proved siblings of a conjecture (same parent, status=proved)."""
+    if conjecture.parent_id is None:
+        return []
+    result = await db.execute(
+        select(Conjecture)
+        .where(
+            Conjecture.parent_id == conjecture.parent_id,
+            Conjecture.id != conjecture.id,
+            Conjecture.status == "proved",
+        )
+        .order_by(Conjecture.created_at.asc())
+    )
+    siblings = result.scalars().all()
+    items = []
+    for s in siblings:
+        proved_by = await _build_author(db, s.proved_by)
+        items.append(
+            {
+                "id": s.id,
+                "lean_statement": s.lean_statement,
+                "description": s.description,
+                "status": s.status,
+                "proof_lean": s.proof_lean,
+                "proved_by": proved_by,
+            }
+        )
+    return items
+
+
+async def get_tree(db: AsyncSession, root_conjecture_id: UUID) -> dict | None:
+    """Build the full nested proof tree starting from root.
+
+    Returns nested dict structure with children arrays.
+    """
+    query = text("""
+        WITH RECURSIVE tree AS (
+            SELECT id, parent_id, lean_statement, description, status, priority,
+                   proved_by, disproved_by, created_at
+            FROM conjectures
+            WHERE id = :root_id
+
+            UNION ALL
+
+            SELECT c.id, c.parent_id, c.lean_statement, c.description, c.status, c.priority,
+                   c.proved_by, c.disproved_by, c.created_at
+            FROM conjectures c
+            JOIN tree t ON c.parent_id = t.id
+            WHERE c.status != 'invalid'
+        )
+        SELECT * FROM tree
+    """)
+    result = await db.execute(query, {"root_id": str(root_conjecture_id)})
+    rows = result.all()
+
+    if not rows:
+        return None
+
+    # Build nodes keyed by id
+    nodes: dict[str, dict] = {}
+    for row in rows:
+        rid = str(row.id)
+        proved_by = await _build_author(db, row.proved_by)
+        disproved_by = await _build_author(db, row.disproved_by)
+        comment_count = await get_comment_count(db, row.id)
+        nodes[rid] = {
+            "id": row.id,
+            "lean_statement": row.lean_statement,
+            "description": row.description,
+            "status": row.status,
+            "priority": row.priority,
+            "proved_by": proved_by,
+            "disproved_by": disproved_by,
+            "comment_count": comment_count,
+            "children": [],
+            "_parent_id": row.parent_id,
+        }
+
+    # Build tree structure
+    root_node = None
+    for node in nodes.values():
+        parent_id = str(node["_parent_id"]) if node["_parent_id"] else None
+        if parent_id and parent_id in nodes:
+            nodes[parent_id]["children"].append(node)
+        else:
+            root_node = node
+
+    # Clean up internal fields
+    for node in nodes.values():
+        node.pop("_parent_id", None)
+
+    return root_node
+
+
+async def list_for_project(
+    db: AsyncSession,
+    project_id: UUID,
+    status: str | None = None,
+    priority: str | None = None,
+    parent_id: UUID | None = None,
+    order_by: str = "priority",
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[dict], int]:
+    """List conjectures for a project with filters.
+
+    Returns (conjecture_dicts, total_count).
+    """
+    base = select(Conjecture).where(Conjecture.project_id == project_id)
+
+    if status:
+        base = base.where(Conjecture.status == status)
+    else:
+        # Default: exclude invalid
+        base = base.where(Conjecture.status != "invalid")
+
+    if priority:
+        base = base.where(Conjecture.priority == priority)
+
+    if parent_id is not None:
+        base = base.where(Conjecture.parent_id == parent_id)
+
+    # Count
+    count_q = select(func.count()).select_from(base.subquery())
+    total = await db.scalar(count_q) or 0
+
+    # Ordering
+    if order_by == "created_at":
+        base = base.order_by(Conjecture.created_at.desc())
+    else:
+        # priority ordering: critical > high > normal > low, then created_at desc
+        priority_order = case(
+            (Conjecture.priority == "critical", 0),
+            (Conjecture.priority == "high", 1),
+            (Conjecture.priority == "normal", 2),
+            (Conjecture.priority == "low", 3),
+            else_=4,
+        )
+        base = base.order_by(priority_order.asc(), Conjecture.created_at.desc())
+
+    base = base.limit(limit).offset(offset)
+    result = await db.execute(base)
+    conjectures = result.scalars().all()
+
+    items = []
+    for c in conjectures:
+        proved_by = await _build_author(db, c.proved_by)
+        disproved_by = await _build_author(db, c.disproved_by)
+        comment_count = await get_comment_count(db, c.id)
+        items.append(
+            {
+                "id": c.id,
+                "project_id": c.project_id,
+                "parent_id": c.parent_id,
+                "lean_statement": c.lean_statement,
+                "description": c.description,
+                "status": c.status,
+                "priority": c.priority,
+                "proved_by": proved_by,
+                "disproved_by": disproved_by,
+                "comment_count": comment_count,
+                "created_at": c.created_at,
             }
         )
 
-    data["proofs"] = proofs
-
-    # Fetch comments and build threaded tree
-    comments_stmt = (
-        select(
-            Comment,
-            Agent.id.label("author_id"),
-            Agent.name.label("author_name"),
-            Agent.reputation.label("author_reputation"),
-        )
-        .join(Agent, Agent.id == Comment.author_id)
-        .where(Comment.conjecture_id == conjecture_id)
-        .order_by(Comment.created_at.asc())
-    )
-    comments_result = await db.execute(comments_stmt)
-    comment_rows = comments_result.all()
-    comment_tree, _ = build_comment_tree(comment_rows, sort="top", limit=20, offset=0)
-    data["comments"] = comment_tree
-
-    return data
+    return items, total

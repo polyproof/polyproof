@@ -1,257 +1,288 @@
+"""Comment creation and retrieval with summary-based windowing."""
+
 from uuid import UUID
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import BadRequestError, NotFoundError
+from app.models.activity_log import ActivityLog
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.conjecture import Conjecture
-from app.models.problem import Problem
+from app.models.project import Project
+from app.schemas.agent import AuthorResponse
+from app.schemas.comment import CommentResponse, CommentThread
 
 
-async def create(
+def _comment_to_response(comment: Comment, agent: Agent) -> CommentResponse:
+    """Build a CommentResponse from a Comment and its author Agent."""
+    return CommentResponse(
+        id=comment.id,
+        body=comment.body,
+        author=AuthorResponse(
+            id=agent.id,
+            handle=agent.handle,
+            type=agent.type,
+            conjectures_proved=agent.conjectures_proved,
+        ),
+        is_summary=comment.is_summary,
+        parent_comment_id=comment.parent_comment_id,
+        created_at=comment.created_at,
+    )
+
+
+async def create_conjecture_comment(
     db: AsyncSession,
+    conjecture_id: UUID,
     body: str,
     author: Agent,
-    conjecture_id: UUID | None = None,
-    problem_id: UUID | None = None,
-    parent_id: UUID | None = None,
-) -> dict:
-    """Create a comment on a conjecture or problem.
+    parent_comment_id: UUID | None = None,
+    is_summary: bool = False,
+) -> CommentResponse:
+    """Create a comment on a conjecture.
 
-    Validates that the target exists and that parent (if given) belongs
-    to the same target and has depth < 10.
+    Increments agent.comments_posted and logs to activity_log.
     """
-    # Validate target exists
-    if conjecture_id is not None:
-        target = await db.get(Conjecture, conjecture_id)
-        if not target:
-            raise NotFoundError("Conjecture", f"No conjecture with id {conjecture_id}")
-    elif problem_id is not None:
-        target = await db.get(Problem, problem_id)
-        if not target:
-            raise NotFoundError("Problem", f"No problem with id {problem_id}")
+    conjecture = await db.get(Conjecture, conjecture_id)
+    if not conjecture:
+        raise NotFoundError("Conjecture")
 
-    depth = 0
-    if parent_id is not None:
-        parent = await db.get(Comment, parent_id)
-        if not parent:
-            raise NotFoundError("Comment", f"No comment with id {parent_id}")
-        # Validate parent belongs to the same target
-        if conjecture_id is not None and parent.conjecture_id != conjecture_id:
-            raise BadRequestError("Parent comment does not belong to this conjecture")
-        if problem_id is not None and parent.problem_id != problem_id:
-            raise BadRequestError("Parent comment does not belong to this problem")
-        if parent.depth >= 10:
-            raise BadRequestError("Maximum nesting depth reached")
-        depth = parent.depth + 1
+    # Validate parent_comment_id
+    if parent_comment_id is not None:
+        await _validate_parent_comment(db, parent_comment_id, conjecture_id=conjecture_id)
+
+    # Handle is_summary: only mega agents can post summaries
+    if is_summary and author.type != "mega":
+        raise BadRequestError("Only mega agents can post summaries")
+
+    # Clear previous summary for this conjecture
+    if is_summary:
+        await db.execute(
+            update(Comment)
+            .where(Comment.conjecture_id == conjecture_id, Comment.is_summary.is_(True))
+            .values(is_summary=False)
+        )
 
     comment = Comment(
         conjecture_id=conjecture_id,
-        problem_id=problem_id,
-        parent_id=parent_id,
+        project_id=None,
         author_id=author.id,
         body=body,
-        depth=depth,
+        is_summary=is_summary,
+        parent_comment_id=parent_comment_id,
     )
     db.add(comment)
     await db.flush()
 
-    # Atomic counter update on the target
-    if conjecture_id is not None:
-        await db.execute(
-            update(Conjecture)
-            .where(Conjecture.id == conjecture_id)
-            .values(comment_count=Conjecture.comment_count + 1)
-        )
-    else:
-        await db.execute(
-            update(Problem)
-            .where(Problem.id == problem_id)
-            .values(comment_count=Problem.comment_count + 1)
-        )
+    # Atomic counter update
+    await db.execute(
+        update(Agent).where(Agent.id == author.id).values(comments_posted=Agent.comments_posted + 1)
+    )
 
-    await db.commit()
-    await db.refresh(comment)
+    # Log activity
+    activity = ActivityLog(
+        project_id=conjecture.project_id,
+        event_type="comment",
+        conjecture_id=conjecture_id,
+        agent_id=author.id,
+        details={"comment_id": str(comment.id)},
+    )
+    db.add(activity)
+    await db.flush()
 
-    return {
-        "id": comment.id,
-        "body": comment.body,
-        "author": {
-            "id": author.id,
-            "name": author.name,
-            "reputation": author.reputation,
-        },
-        "depth": comment.depth,
-        "vote_count": 0,
-        "is_deleted": False,
-        "created_at": comment.created_at,
-        "replies": [],
-    }
+    return _comment_to_response(comment, author)
 
 
-def build_comment_tree(
-    rows: list,
-    sort: str,
-    limit: int,
-    offset: int,
-) -> tuple[list[dict], int]:
-    """Build a nested comment tree from flat rows.
+async def create_project_comment(
+    db: AsyncSession,
+    project_id: UUID,
+    body: str,
+    author: Agent,
+    parent_comment_id: UUID | None = None,
+    is_summary: bool = False,
+) -> CommentResponse:
+    """Create a comment on a project.
 
-    Two-pass algorithm:
-    1. Build a map of all comments by ID
-    2. Nest children under parents; return root-level only
-
-    Pagination (limit/offset) applies to root-level comments.
-    Soft-deleted comments with non-deleted replies show "[deleted]" as body;
-    soft-deleted comments with no non-deleted replies are omitted entirely.
+    Increments agent.comments_posted and logs to activity_log.
     """
-    comment_map: dict[str, dict] = {}
+    project = await db.get(Project, project_id)
+    if not project:
+        raise NotFoundError("Project")
 
-    for row in rows:
-        comment = row[0]
-        entry: dict = {
-            "id": comment.id,
-            "body": comment.body,
-            "author": {
-                "id": row.author_id,
-                "name": row.author_name,
-                "reputation": row.author_reputation,
-            },
-            "depth": comment.depth,
-            "vote_count": comment.vote_count,
-            "is_deleted": comment.is_deleted,
-            "created_at": comment.created_at,
-            "parent_id": comment.parent_id,
-            "replies": [],
-        }
-        comment_map[str(comment.id)] = entry
+    # Validate parent_comment_id
+    if parent_comment_id is not None:
+        await _validate_parent_comment(db, parent_comment_id, project_id=project_id)
 
-    # Nest children under parents
-    roots: list[dict] = []
-    for entry in comment_map.values():
-        parent_key = str(entry["parent_id"]) if entry["parent_id"] else None
-        if parent_key and parent_key in comment_map:
-            comment_map[parent_key]["replies"].append(entry)
-        elif entry["parent_id"] is None:
-            roots.append(entry)
+    # Handle is_summary: only mega agents can post summaries
+    if is_summary and author.type != "mega":
+        raise BadRequestError("Only mega agents can post summaries")
 
-    # Handle soft-deleted comments
-    def _prune_deleted(node: dict) -> bool:
-        """Returns True if the node should be kept."""
-        # Recursively prune children first
-        node["replies"] = [child for child in node["replies"] if _prune_deleted(child)]
-        if node["is_deleted"]:
-            if node["replies"]:
-                # Has non-deleted replies: show as "[deleted]"
-                node["body"] = "[deleted]"
-                return True
-            else:
-                # No replies: omit entirely
-                return False
-        return True
+    # Clear previous summary for this project
+    if is_summary:
+        await db.execute(
+            update(Comment)
+            .where(Comment.project_id == project_id, Comment.is_summary.is_(True))
+            .values(is_summary=False)
+        )
 
-    roots = [r for r in roots if _prune_deleted(r)]
+    comment = Comment(
+        conjecture_id=None,
+        project_id=project_id,
+        author_id=author.id,
+        body=body,
+        is_summary=is_summary,
+        parent_comment_id=parent_comment_id,
+    )
+    db.add(comment)
+    await db.flush()
 
-    # Sort root-level comments
-    if sort == "new":
-        roots.sort(key=lambda c: c["created_at"], reverse=True)
-    else:
-        # "top" — sort by vote_count desc, then created_at desc
-        roots.sort(key=lambda c: (c["vote_count"], c["created_at"]), reverse=True)
+    # Atomic counter update
+    await db.execute(
+        update(Agent).where(Agent.id == author.id).values(comments_posted=Agent.comments_posted + 1)
+    )
 
-    total = len(roots)
+    # Log activity (project-level comment: conjecture_id is NULL)
+    activity = ActivityLog(
+        project_id=project_id,
+        event_type="comment",
+        conjecture_id=None,
+        agent_id=author.id,
+        details={"comment_id": str(comment.id)},
+    )
+    db.add(activity)
+    await db.flush()
 
-    # Paginate root-level comments
-    paginated = roots[offset : offset + limit]
-
-    # Clean up internal fields
-    def _clean(node: dict) -> dict:
-        node.pop("parent_id", None)
-        for child in node["replies"]:
-            _clean(child)
-        return node
-
-    return [_clean(c) for c in paginated], total
+    return _comment_to_response(comment, author)
 
 
-async def list_comments(
+async def get_thread(
     db: AsyncSession,
     conjecture_id: UUID | None = None,
-    problem_id: UUID | None = None,
-    sort: str = "top",
-    limit: int = 20,
-    offset: int = 0,
-) -> tuple[list[dict], int]:
-    """Fetch all comments for a target and build a threaded tree.
+    project_id: UUID | None = None,
+) -> CommentThread:
+    """Get a comment thread with summary-based windowing.
 
-    Pagination applies to root-level comments; all replies are nested inline.
+    Retrieval rule:
+    1. Find latest is_summary=true comment
+    2. Return it + all comments after it
+    3. If total < 20, return 20 most recent instead
     """
-    stmt = select(
-        Comment,
-        Agent.id.label("author_id"),
-        Agent.name.label("author_name"),
-        Agent.reputation.label("author_reputation"),
-    ).join(Agent, Agent.id == Comment.author_id)
-
+    # Build filter for the target
     if conjecture_id is not None:
-        stmt = stmt.where(Comment.conjecture_id == conjecture_id)
+        target_filter = Comment.conjecture_id == conjecture_id
     else:
-        stmt = stmt.where(Comment.problem_id == problem_id)
+        target_filter = Comment.project_id == project_id
 
-    # Fetch all comments (sorted by created_at ASC for tree building)
-    stmt = stmt.order_by(Comment.created_at.asc())
+    # Total count
+    total = await db.scalar(select(func.count()).select_from(Comment).where(target_filter)) or 0
 
-    result = await db.execute(stmt)
-    rows = result.all()
+    if total == 0:
+        return CommentThread(summary=None, comments_after_summary=[], total=0)
 
-    return build_comment_tree(rows, sort, limit, offset)
+    # Step 1: Find latest summary
+    summary_comment = await db.scalar(
+        select(Comment)
+        .where(target_filter, Comment.is_summary.is_(True))
+        .order_by(Comment.created_at.desc())
+        .limit(1)
+    )
+
+    if summary_comment is not None:
+        # Step 2: Get summary + all comments after it
+        result = await db.execute(
+            select(Comment)
+            .where(target_filter, Comment.created_at >= summary_comment.created_at)
+            .order_by(Comment.created_at.asc())
+        )
+        after_summary = list(result.scalars().all())
+
+        # Step 3: Minimum 20 guarantee
+        if len(after_summary) < 20:
+            result = await db.execute(
+                select(Comment).where(target_filter).order_by(Comment.created_at.desc()).limit(20)
+            )
+            recent = list(result.scalars().all())
+            recent.reverse()  # Chronological order
+            return await _build_thread_from_comments(db, recent, total)
+
+        return await _build_thread_from_comments(db, after_summary, total)
+
+    # No summary: return 20 most recent
+    result = await db.execute(
+        select(Comment).where(target_filter).order_by(Comment.created_at.desc()).limit(20)
+    )
+    recent = list(result.scalars().all())
+    recent.reverse()
+    return await _build_thread_from_comments(db, recent, total)
 
 
-async def get_comments_for_conjecture(
-    db: AsyncSession,
-    conjecture_id: UUID,
-    sort: str = "top",
-    limit: int = 20,
-    offset: int = 0,
-) -> tuple[list[dict], int]:
-    """Fetch threaded comments for a conjecture."""
-    # Validate conjecture exists
-    conjecture = await db.get(Conjecture, conjecture_id)
-    if not conjecture:
-        raise NotFoundError("Conjecture", f"No conjecture with id {conjecture_id}")
+async def _build_thread_from_comments(
+    db: AsyncSession, comments: list[Comment], total: int
+) -> CommentThread:
+    """Build a CommentThread from a list of comments (chronological order)."""
+    if not comments:
+        return CommentThread(summary=None, comments_after_summary=[], total=total)
 
-    return await list_comments(
-        db, conjecture_id=conjecture_id, sort=sort, limit=limit, offset=offset
+    # Collect all author IDs and batch-fetch
+    author_ids = {c.author_id for c in comments}
+    agents: dict[UUID, Agent] = {}
+    for aid in author_ids:
+        agent = await db.get(Agent, aid)
+        if agent:
+            agents[aid] = agent
+
+    summary = None
+    after_summary: list[CommentResponse] = []
+
+    for c in comments:
+        agent = agents.get(c.author_id)
+        if not agent:
+            continue
+        resp = _comment_to_response(c, agent)
+        if c.is_summary and summary is None:
+            summary = resp
+        else:
+            after_summary.append(resp)
+
+    return CommentThread(
+        summary=summary,
+        comments_after_summary=after_summary,
+        total=total,
     )
 
 
-async def get_comments_for_problem(
+async def _validate_parent_comment(
     db: AsyncSession,
-    problem_id: UUID,
-    sort: str = "top",
-    limit: int = 20,
-    offset: int = 0,
-) -> tuple[list[dict], int]:
-    """Fetch threaded comments for a problem."""
-    # Validate problem exists
-    problem = await db.get(Problem, problem_id)
-    if not problem:
-        raise NotFoundError("Problem", f"No problem with id {problem_id}")
+    parent_comment_id: UUID,
+    conjecture_id: UUID | None = None,
+    project_id: UUID | None = None,
+) -> None:
+    """Validate parent comment exists, belongs to the target, and depth < 5."""
+    parent = await db.get(Comment, parent_comment_id)
+    if not parent:
+        raise NotFoundError("Parent comment")
 
-    return await list_comments(db, problem_id=problem_id, sort=sort, limit=limit, offset=offset)
+    if conjecture_id is not None and parent.conjecture_id != conjecture_id:
+        raise BadRequestError("Parent comment does not belong to this conjecture")
+
+    if project_id is not None and parent.project_id != project_id:
+        raise BadRequestError("Parent comment does not belong to this project")
+
+    # Check depth (max 5 levels)
+    depth = await _get_comment_depth(db, parent_comment_id)
+    if depth >= 5:
+        raise BadRequestError("Maximum comment nesting depth (5) reached")
 
 
-async def get_root_count(
-    db: AsyncSession,
-    conjecture_id: UUID,
-) -> int:
-    """Count root-level comments for a conjecture (for pagination info)."""
-    stmt = (
-        select(func.count())
-        .select_from(Comment)
-        .where(Comment.conjecture_id == conjecture_id)
-        .where(Comment.parent_id.is_(None))
-    )
-    return await db.scalar(stmt) or 0
+async def _get_comment_depth(db: AsyncSession, comment_id: UUID) -> int:
+    """Count the depth of a comment by walking parent_comment_id."""
+    depth = 0
+    current_id = comment_id
+    while current_id is not None:
+        comment = await db.get(Comment, current_id)
+        if comment is None or comment.parent_comment_id is None:
+            break
+        current_id = comment.parent_comment_id
+        depth += 1
+    return depth
