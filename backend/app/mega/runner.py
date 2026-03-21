@@ -20,7 +20,7 @@ from app.mega.tools import MEGA_AGENT_TOOLS
 logger = logging.getLogger(__name__)
 
 _MODEL = "gpt-5.4"
-_MAX_TOOL_CALLS = 25
+_MAX_TOOL_CALLS = 50
 
 
 async def run_mega_agent(
