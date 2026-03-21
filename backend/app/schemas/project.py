@@ -7,13 +7,13 @@ from app.schemas.agent import AuthorResponse
 
 
 class RootConjectureCreate(BaseModel):
-    lean_statement: str = Field(..., min_length=1)
-    description: str = Field(..., min_length=1)
+    lean_statement: str = Field(..., min_length=1, max_length=100_000)
+    description: str = Field(..., min_length=1, max_length=10_000)
 
 
 class ProjectCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
-    description: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1, max_length=10_000)
     root_conjecture: RootConjectureCreate
 
 
