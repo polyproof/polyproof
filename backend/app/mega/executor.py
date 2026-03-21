@@ -139,11 +139,15 @@ async def _post_comment(
     """Post a comment via comment_service."""
     from app.services import comment_service
 
-    conjecture_id = args.get("conjecture_id")
-    comment_project_id = args.get("project_id") or str(project_id)
+    conjecture_id = args.get("conjecture_id") or None
+    comment_project_id = args.get("project_id") or None
     body = args["body"]
     is_summary = args.get("is_summary", False)
-    parent_comment_id = args.get("parent_comment_id")
+    parent_comment_id = args.get("parent_comment_id") or None
+
+    # Fallback: if neither target is specified, use the project_id from context
+    if not conjecture_id and not comment_project_id:
+        comment_project_id = str(project_id)
 
     from app.models.agent import Agent
 
