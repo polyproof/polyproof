@@ -79,8 +79,10 @@ async def test_assembly_triggered_when_all_children_proved(
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     # Mock lean to pass for proofs and for assembly verification
+    from app.services.lean_client import LeanResult
+
     async def _mock_pass(*args, **kwargs):
-        return {"status": "passed", "error": None}
+        return LeanResult(status="passed", error=None)
 
     monkeypatch.setattr("app.services.lean_client.verify_proof", _mock_pass, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify_sorry_proof", _mock_pass, raising=False)

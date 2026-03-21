@@ -6,7 +6,8 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy import text as sa_text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.deps import get_db
 from app.db.connection import Base
@@ -17,30 +18,37 @@ from app.models.project import Project
 
 TEST_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://test:test@localhost:5432/polyproof_test",
+    "postgresql+asyncpg://andy@localhost:5432/polyproof_test",
 )
 
-engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+
+@pytest.fixture(scope="session")
+def event_loop_policy():
+    """Use default event loop policy for all tests."""
+    import asyncio
+
+    return asyncio.DefaultEventLoopPolicy()
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def setup_database():
-    async with engine.begin() as conn:
+@pytest.fixture(scope="function")
+async def engine():
+    eng = create_async_engine(TEST_DATABASE_URL, echo=False)
+    async with eng.begin() as conn:
+        await conn.execute(sa_text("DROP SCHEMA IF EXISTS public CASCADE"))
+        await conn.execute(sa_text("CREATE SCHEMA public"))
         await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+    yield eng
+    async with eng.begin() as conn:
+        await conn.execute(sa_text("DROP SCHEMA IF EXISTS public CASCADE"))
+        await conn.execute(sa_text("CREATE SCHEMA public"))
+    await eng.dispose()
 
 
 @pytest.fixture
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with engine.connect() as conn:
-        trans = await conn.begin()
-        session = AsyncSession(bind=conn, expire_on_commit=False)
+async def db_session(engine) -> AsyncGenerator[AsyncSession, None]:
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_factory() as session:
         yield session
-        await session.close()
-        await trans.rollback()
 
 
 @pytest.fixture
@@ -62,7 +70,7 @@ async def seed_agent(db_session: AsyncSession) -> dict:
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     agent = Agent(
         id=uuid4(),
-        handle="test_agent",
+        handle="test_agent_" + secrets.token_hex(4),
         type="community",
         api_key_hash=key_hash,
     )
@@ -78,7 +86,7 @@ async def seed_mega_agent(db_session: AsyncSession) -> dict:
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     agent = Agent(
         id=uuid4(),
-        handle="mega_agent",
+        handle="mega_agent_" + secrets.token_hex(4),
         type="mega",
         api_key_hash=key_hash,
     )
@@ -88,7 +96,7 @@ async def seed_mega_agent(db_session: AsyncSession) -> dict:
 
 
 @pytest.fixture
-async def seed_project(db_session: AsyncSession) -> dict:
+async def seed_project(db_session: AsyncSession, seed_agent: dict) -> dict:
     """Create a project with a root conjecture and return both."""
     project_id = uuid4()
     conjecture_id = uuid4()
@@ -128,24 +136,28 @@ def auth_headers(seed_agent: dict) -> dict:
 @pytest.fixture
 def mock_lean_pass(monkeypatch):
     """Mock Lean CI to always return pass."""
+    from app.services.lean_client import LeanResult
 
     async def _mock(*args, **kwargs):
-        return {"status": "passed", "error": None}
+        return LeanResult(status="passed", error=None)
 
     monkeypatch.setattr("app.services.lean_client.typecheck", _mock, raising=False)
-    monkeypatch.setattr("app.services.lean_client.verify", _mock, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify_proof", _mock, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify_disproof", _mock, raising=False)
+    monkeypatch.setattr("app.services.lean_client.verify_sorry_proof", _mock, raising=False)
+    monkeypatch.setattr("app.services.lean_client.verify_freeform", _mock, raising=False)
 
 
 @pytest.fixture
 def mock_lean_fail(monkeypatch):
     """Mock Lean CI to always return rejection."""
+    from app.services.lean_client import LeanResult
 
     async def _mock(*args, **kwargs):
-        return {"status": "rejected", "error": "type mismatch"}
+        return LeanResult(status="rejected", error="type mismatch")
 
     monkeypatch.setattr("app.services.lean_client.typecheck", _mock, raising=False)
-    monkeypatch.setattr("app.services.lean_client.verify", _mock, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify_proof", _mock, raising=False)
     monkeypatch.setattr("app.services.lean_client.verify_disproof", _mock, raising=False)
+    monkeypatch.setattr("app.services.lean_client.verify_sorry_proof", _mock, raising=False)
+    monkeypatch.setattr("app.services.lean_client.verify_freeform", _mock, raising=False)

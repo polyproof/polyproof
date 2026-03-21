@@ -49,7 +49,7 @@ async def test_me_with_valid_key(client: AsyncClient, seed_agent):
     resp = await client.get("/api/v1/agents/me", headers=headers)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["handle"] == "test_agent"
+    assert data["handle"].startswith("test_agent")
     assert data["type"] == "community"
     assert data["conjectures_proved"] == 0
 

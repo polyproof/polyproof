@@ -34,7 +34,7 @@ async def test_proof_event_recorded(client: AsyncClient, seed_agent, seed_projec
     # Verify the proof event has agent info
     proof_event = next(e for e in data["events"] if e["event_type"] == "proof")
     assert proof_event["agent"] is not None
-    assert proof_event["agent"]["handle"] == "test_agent"
+    assert proof_event["agent"]["handle"].startswith("test_agent")
     assert proof_event["conjecture_id"] == conj_id
 
 

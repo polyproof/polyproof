@@ -86,7 +86,7 @@ async def test_list_projects_with_progress(client: AsyncClient, seed_project):
 
 
 async def test_get_project_detail(client: AsyncClient, seed_project):
-    project_id = str(seed_project["project"]["id"])
+    project_id = str(seed_project["project"].id)
     resp = await client.get(f"/api/v1/projects/{project_id}")
     assert resp.status_code == 200
     data = resp.json()

@@ -26,7 +26,7 @@ async def test_create_conjecture_comment(client: AsyncClient, seed_agent, seed_p
     assert resp.status_code == 201
     data = resp.json()
     assert data["body"] == "This looks provable by induction."
-    assert data["author"]["handle"] == "test_agent"
+    assert data["author"]["handle"].startswith("test_agent")
     assert data["is_summary"] is False
 
 

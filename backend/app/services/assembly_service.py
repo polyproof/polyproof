@@ -41,7 +41,9 @@ async def check_and_assemble(conjecture_id: UUID, db: AsyncSession) -> bool:
     if parent is None or parent.status != "decomposed":
         return False
 
-    # Check if all non-invalid children are proved
+    # Check if all non-invalid children are proved.
+    # Use populate_existing to bypass the identity map and get fresh data
+    # from the database (child proofs may have been set via raw SQL).
     children_result = await db.execute(
         select(Conjecture)
         .where(
@@ -49,6 +51,7 @@ async def check_and_assemble(conjecture_id: UUID, db: AsyncSession) -> bool:
             Conjecture.status != "invalid",
         )
         .order_by(Conjecture.created_at.asc())
+        .execution_options(populate_existing=True)
     )
     children = list(children_result.scalars().all())
 

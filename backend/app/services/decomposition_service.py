@@ -361,7 +361,7 @@ async def _invalidate_with_descendants(conjecture_id: UUID, db: AsyncSession) ->
     """Invalidate a conjecture and all its descendants. Returns list of invalidated IDs."""
     invalidated_query = text("""
         WITH RECURSIVE descendants AS (
-            SELECT :root_id::uuid AS id
+            SELECT CAST(:root_id AS uuid) AS id
             UNION ALL
             SELECT c.id FROM conjectures c
             JOIN descendants d ON c.parent_id = d.id
