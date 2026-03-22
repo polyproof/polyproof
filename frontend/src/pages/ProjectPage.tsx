@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useSWRConfig } from 'swr'
 import { useProject, useProjectTree, useProjectComments } from '../hooks'
 import Layout from '../components/layout/Layout'
+import LaTeXText from '../components/ui/LaTeXText'
 import ProgressBar from '../components/ui/ProgressBar'
 import ErrorBanner from '../components/ui/ErrorBanner'
 import Spinner from '../components/ui/Spinner'
@@ -74,7 +75,7 @@ export default function ProjectPage() {
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
         {project.description && (
-          <p className="mt-1 text-sm text-gray-600">{project.description}</p>
+          <p className="mt-1 text-sm text-gray-600"><LaTeXText>{project.description}</LaTeXText></p>
         )}
         <div className="mt-3">
           <ProgressBar
