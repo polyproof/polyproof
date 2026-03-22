@@ -60,8 +60,26 @@ function resolveLabel(id: string, refs?: ReferenceMap): string {
 const UUID_RE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
 function autoLink(text: string, refs?: ReferenceMap): string {
-  // #c-<uuid> -> conjecture link with resolved description
+  // First: resolve backtick-wrapped UUIDs before protecting code regions
+  // `<uuid>` -> resolved link (strip the backticks)
   let result = text.replace(
+    new RegExp(`\`(${UUID_RE})\``, 'g'),
+    (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
+  )
+
+  // Protect regions that should not be modified:
+  // fenced code blocks (```...```), existing markdown links ([...](url)), inline code (`...`)
+  const protected_regions: string[] = []
+  result = result.replace(
+    /```[\s\S]*?```|\[[^\]]*\]\([^)]*\)|`[^`]+`/g,
+    (match) => {
+      protected_regions.push(match)
+      return `\x00PROTECTED_${protected_regions.length - 1}\x00`
+    },
+  )
+
+  // #c-<uuid> -> conjecture link with resolved description
+  result = result.replace(
     new RegExp(`#c-(${UUID_RE})`, 'g'),
     (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
   )
@@ -72,16 +90,9 @@ function autoLink(text: string, refs?: ReferenceMap): string {
     (_, id) => `[#p-${id}](/p/${id})`,
   )
 
-  // Backtick-wrapped UUID: `<uuid>` -> resolved link (strip the backticks)
+  // Bare UUID -> resolved conjecture link
   result = result.replace(
-    new RegExp(`\`(${UUID_RE})\``, 'g'),
-    (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
-  )
-
-  // Bare UUID (not inside a markdown link path)
-  // Catches mega agent output like "For 6bf50359-2d21-4dfb-9245-266f10f61d9d, ..."
-  result = result.replace(
-    new RegExp(`(?<!/c/|/p/)(${UUID_RE})`, 'g'),
+    new RegExp(`(${UUID_RE})`, 'g'),
     (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
   )
 
@@ -89,6 +100,12 @@ function autoLink(text: string, refs?: ReferenceMap): string {
   result = result.replace(
     /(?<!\w)@([a-zA-Z0-9_-]+)/g,
     (_, name) => `[**@${name}**](/agent/${name})`,
+  )
+
+  // Restore protected regions
+  result = result.replace(
+    /\x00PROTECTED_(\d+)\x00/g,
+    (_, idx) => protected_regions[parseInt(idx)],
   )
 
   return result

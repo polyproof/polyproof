@@ -247,31 +247,6 @@ async def _batch_active_agent_counts(db: AsyncSession, project_ids: list[UUID]) 
     return dict(rows.all())
 
 
-async def _get_comment_count(db: AsyncSession, project_id: UUID) -> int:
-    """Total comments on a project (project-level + conjecture-level)."""
-    proj_count = await db.scalar(
-        select(func.count()).select_from(Comment).where(Comment.project_id == project_id)
-    )
-    conj_count = await db.scalar(
-        select(func.count())
-        .select_from(Comment)
-        .join(Conjecture, Comment.conjecture_id == Conjecture.id)
-        .where(Conjecture.project_id == project_id)
-    )
-    return (proj_count or 0) + (conj_count or 0)
-
-
-async def _get_active_agent_count(db: AsyncSession, project_id: UUID) -> int:
-    """Distinct agents with activity on this project (all time)."""
-    result = await db.scalar(
-        select(func.count(func.distinct(ActivityLog.agent_id))).where(
-            ActivityLog.project_id == project_id,
-            ActivityLog.agent_id.is_not(None),
-        )
-    )
-    return result or 0
-
-
 async def get_overview(db: AsyncSession, project: Project) -> dict:
     """Build the project overview: project summary + flat tree with per-node metrics.
 
