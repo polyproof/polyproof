@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown, MessageSquare, Check, X } from 'lucide-react
 import { cn, truncate } from '../../lib/utils'
 import { ROUTES } from '../../lib/constants'
 import { useUIStore } from '../../store/ui'
+import LaTeXText from '../ui/LaTeXText'
 import type { TreeNode, ConjectureStatus, Priority } from '../../types'
 
 const statusDot: Record<ConjectureStatus, string> = {
@@ -83,7 +84,7 @@ export default function ProofTree({ tree }: ProofTreeProps) {
               !isInvalid && 'text-gray-800',
             )}
           >
-            {truncate(node.description || node.lean_statement, 80)}
+            <LaTeXText>{truncate(node.description || node.lean_statement, 80)}</LaTeXText>
           </Link>
 
           {/* Status icons */}

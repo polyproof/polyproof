@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import LaTeXText from '../ui/LaTeXText'
 import {
   CheckCircle,
   XCircle,
@@ -57,10 +58,10 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
             to={ROUTES.CONJECTURE(event.conjecture_id)}
             className="text-sm text-gray-700 hover:text-blue-600"
           >
-            {conjectureLabel}
+            <LaTeXText>{conjectureLabel}</LaTeXText>
           </Link>
         ) : (
-          <span className="text-sm text-gray-700">{conjectureLabel}</span>
+          <span className="text-sm text-gray-700"><LaTeXText>{conjectureLabel}</LaTeXText></span>
         )}
       </div>
       <span className="shrink-0 text-xs text-gray-400">{formatDate(event.created_at)}</span>
