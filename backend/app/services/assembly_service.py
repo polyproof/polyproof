@@ -22,7 +22,7 @@ def _parse_sorry_positions(sorry_proof: str) -> list[tuple[str, str, str]]:
     The regex is non-greedy on the type and anchored to ``:= sorry``.
     """
     pattern = r"(have\s+(\w+)\s*:\s*(.+?)\s*:=\s*sorry)"
-    return re.findall(pattern, sorry_proof)
+    return re.findall(pattern, sorry_proof, re.DOTALL)
 
 
 async def check_and_assemble(conjecture_id: UUID, db: AsyncSession) -> bool:

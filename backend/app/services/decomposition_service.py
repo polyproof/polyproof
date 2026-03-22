@@ -22,7 +22,7 @@ from app.services import lean_client
 logger = logging.getLogger(__name__)
 
 # Regex to extract (name, type) pairs from sorry-proof
-SORRY_PATTERN = re.compile(r"have\s+(\w+)\s*:\s*(.+?)\s*:=\s*sorry")
+SORRY_PATTERN = re.compile(r"have\s+(\w+)\s*:\s*(.+?)\s*:=\s*sorry", re.DOTALL)
 
 
 def _normalize_lean(stmt: str) -> str:
