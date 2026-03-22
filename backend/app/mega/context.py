@@ -129,6 +129,11 @@ def _format_trigger(trigger_type: str, trigger: dict) -> str:
         return f"{count} interactions since your last invocation."
     elif trigger_type == "periodic_heartbeat":
         return "24 hours since last invocation. No activity threshold fired."
+    elif trigger_type == "project_completed":
+        return (
+            "The root conjecture has been PROVED. The project is complete. "
+            "Write a final retrospective summary."
+        )
     return f"Unknown trigger: {trigger_type}"
 
 

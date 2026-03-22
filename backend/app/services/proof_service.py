@@ -159,12 +159,26 @@ async def submit_proof(
             assembly_triggered = True
             parent_proved = await assembly_service.check_and_assemble(conjecture_id, db)
 
+    # Fire project_completed if this is the root conjecture
+    await _check_project_completed(conjecture, db)
+
     return ProofResult(
         status="proved",
         conjecture_id=conjecture_id,
         assembly_triggered=assembly_triggered,
         parent_proved=parent_proved,
     )
+
+
+async def _check_project_completed(conjecture: Conjecture, db: AsyncSession) -> None:
+    """Fire project_completed trigger if the proved conjecture is the project root."""
+    import asyncio
+
+    project = await db.get(Project, conjecture.project_id)
+    if project and project.root_conjecture_id == conjecture.id:
+        from app.mega.scheduler import fire_project_completed
+
+        asyncio.create_task(fire_project_completed(project.id))
 
 
 async def submit_disproof(

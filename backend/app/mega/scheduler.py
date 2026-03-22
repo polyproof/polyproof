@@ -184,6 +184,21 @@ async def _invoke_mega_agent(
             logger.exception("Mega agent invocation failed for project %s", project_id)
 
 
+async def fire_project_completed(project_id: UUID) -> None:
+    """Fire a project_completed trigger immediately.
+
+    Called when the root conjecture is proved (via direct proof or assembly).
+    Uses its own DB session since the caller's session may not be committed yet.
+    """
+    logger.info("Firing project_completed trigger for project %s", project_id)
+    async with async_session_factory() as db:
+        await _invoke_mega_agent(
+            project_id,
+            {"trigger": "project_completed"},
+            db,
+        )
+
+
 async def _get_or_create_mega_agent_id(db: AsyncSession) -> UUID:
     """Get the mega agent's agent ID, creating it if necessary.
 
