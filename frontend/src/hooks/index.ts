@@ -13,6 +13,10 @@ export function useProjectTree(projectId: string) {
   return useSWR(['project-tree', projectId], () => api.getProjectTree(projectId))
 }
 
+export function useProjectOverview(projectId: string) {
+  return useSWR(['project-overview', projectId], () => api.getProjectOverview(projectId))
+}
+
 export function useConjecture(id: string) {
   return useSWR(['conjecture', id], () => api.getConjecture(id))
 }

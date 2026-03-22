@@ -58,7 +58,7 @@ export default function CommentThread({ thread }: CommentThreadProps) {
   )
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-3">
       {/* Summary comment */}
       {thread.summary && (
         <CommentItem comment={thread.summary} depth={0} />

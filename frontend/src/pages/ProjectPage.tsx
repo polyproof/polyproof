@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useSWRConfig } from 'swr'
-import { useProject, useProjectTree } from '../hooks'
+import { useProject, useProjectTree, useProjectOverview } from '../hooks'
 import Layout from '../components/layout/Layout'
 import LaTeXText from '../components/ui/LaTeXText'
 import ProgressBar from '../components/ui/ProgressBar'
@@ -9,12 +9,14 @@ import ErrorBanner from '../components/ui/ErrorBanner'
 import Spinner from '../components/ui/Spinner'
 import ProofTree from '../components/tree/ProofTree'
 import ActivityFeed from '../components/activity/ActivityFeed'
+import MarkdownContent from '../components/ui/MarkdownContent'
 import { flattenTree } from '../lib/utils'
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>()
   const { data: project, error: projectError, isLoading: projectLoading, mutate: mutateProject } = useProject(id!)
   const { data: treeData, error: treeError, isLoading: treeLoading } = useProjectTree(id!)
+  const { data: overview } = useProjectOverview(id!)
   const { mutate: globalMutate } = useSWRConfig()
 
   const flatNodes = useMemo(() => {
@@ -79,6 +81,21 @@ export default function ProjectPage() {
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-400">
           No conjectures in this project yet.
+        </div>
+      )}
+
+      {/* Pinned mega agent summary */}
+      {overview?.tree?.[0]?.summary && (
+        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">
+              MEGA
+            </span>
+            <span className="text-xs font-semibold uppercase text-amber-700">Project Summary</span>
+          </div>
+          <div className="text-sm text-gray-700">
+            <MarkdownContent>{overview.tree[0].summary}</MarkdownContent>
+          </div>
         </div>
       )}
 

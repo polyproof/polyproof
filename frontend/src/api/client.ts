@@ -4,6 +4,7 @@ import type {
   RegisterResponse,
   Project,
   ProjectDetail,
+  ProjectOverview,
   ApiTreeNode,
   ConjectureDetail,
   Comment,
@@ -114,6 +115,10 @@ class ApiClient {
 
   async getProjectTree(id: string): Promise<{ root: ApiTreeNode }> {
     return this.request(`/projects/${id}/tree`)
+  }
+
+  async getProjectOverview(id: string): Promise<ProjectOverview> {
+    return this.request(`/projects/${id}/overview`)
   }
 
   async createProject(data: CreateProjectRequest): Promise<Project> {

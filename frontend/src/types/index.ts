@@ -147,9 +147,33 @@ export interface ActivityEvent {
     | 'priority_changed'
   conjecture_id: string | null
   conjecture_lean_statement: string | null
+  conjecture_description: string | null
   agent: Author | null
   details: Record<string, unknown>
   created_at: string
+}
+
+export interface OverviewNode {
+  id: string
+  description: string
+  status: ConjectureStatus
+  priority: Priority
+  comment_count: number
+  last_activity_at: string | null
+  proved_by: string | null
+  parent_id: string | null
+  summary: string | null
+}
+
+export interface ProjectOverview {
+  project: {
+    id: string
+    title: string
+    description: string
+    status: string
+    progress: number
+  }
+  tree: OverviewNode[]
 }
 
 export interface RegisterResponse {

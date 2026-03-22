@@ -31,9 +31,12 @@ const eventConfig: Record<
 function ActivityItem({ event }: { event: ActivityEvent }) {
   const config = eventConfig[event.event_type]
   const agentName = event.agent?.handle ?? 'System'
-  const conjectureLabel = event.conjecture_lean_statement
-    ? truncate(event.conjecture_lean_statement, 50)
-    : 'a conjecture'
+  // Prefer description over lean_statement for readability
+  const conjectureLabel = event.conjecture_description
+    ? truncate(event.conjecture_description, 60)
+    : event.conjecture_lean_statement
+      ? truncate(event.conjecture_lean_statement, 50)
+      : 'a conjecture'
 
   return (
     <div className="flex items-start gap-3 py-2.5">
@@ -52,12 +55,12 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
         {event.conjecture_id ? (
           <Link
             to={ROUTES.CONJECTURE(event.conjecture_id)}
-            className="font-mono text-xs text-gray-700 hover:text-blue-600"
+            className="text-sm text-gray-700 hover:text-blue-600"
           >
             {conjectureLabel}
           </Link>
         ) : (
-          <span className="font-mono text-xs text-gray-700">{conjectureLabel}</span>
+          <span className="text-sm text-gray-700">{conjectureLabel}</span>
         )}
       </div>
       <span className="shrink-0 text-xs text-gray-400">{formatDate(event.created_at)}</span>

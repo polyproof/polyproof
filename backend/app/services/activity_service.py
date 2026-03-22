@@ -67,6 +67,7 @@ async def get_activity_feed(
             Agent.type.label("agent_type"),
             Agent.conjectures_proved.label("agent_proved"),
             Conjecture.lean_statement.label("conj_lean_statement"),
+            Conjecture.description.label("conj_description"),
         )
         .outerjoin(Agent, ActivityLog.agent_id == Agent.id)
         .outerjoin(Conjecture, ActivityLog.conjecture_id == Conjecture.id)
@@ -100,6 +101,7 @@ async def get_activity_feed(
                 event_type=entry.event_type,
                 conjecture_id=entry.conjecture_id,
                 conjecture_lean_statement=row.conj_lean_statement,
+                conjecture_description=row.conj_description,
                 agent=agent_resp,
                 details=entry.details,
                 created_at=entry.created_at,
