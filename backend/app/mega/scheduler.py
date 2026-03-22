@@ -185,13 +185,28 @@ async def _invoke_mega_agent(
 
 
 async def fire_project_completed(project_id: UUID) -> None:
-    """Fire a project_completed trigger immediately.
+    """Fire a project_completed trigger after the caller's transaction commits.
 
-    Called when the root conjecture is proved (via direct proof or assembly).
-    Uses its own DB session since the caller's session may not be committed yet.
+    Called via asyncio.create_task when the root conjecture is proved (via
+    direct proof or assembly). Waits briefly for the caller's transaction to
+    commit, then verifies the root is actually proved before invoking.
     """
-    logger.info("Firing project_completed trigger for project %s", project_id)
+    # Wait for the caller's transaction to commit
+    await asyncio.sleep(2)
+
     async with async_session_factory() as db:
+        # Verify the root is actually proved (guards against rollbacks)
+        project = await db.get(Project, project_id)
+        if not project or not project.root_conjecture_id:
+            return
+        from app.models.conjecture import Conjecture
+
+        root = await db.get(Conjecture, project.root_conjecture_id)
+        if not root or root.status != "proved":
+            logger.info("Root not proved for project %s, skipping project_completed", project_id)
+            return
+
+        logger.info("Firing project_completed trigger for project %s", project_id)
         await _invoke_mega_agent(
             project_id,
             {"trigger": "project_completed"},
