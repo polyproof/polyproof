@@ -9,6 +9,7 @@ import Spinner from '../components/ui/Spinner'
 import ProofTree from '../components/tree/ProofTree'
 import ActivityFeed from '../components/activity/ActivityFeed'
 import MarkdownContent from '../components/ui/MarkdownContent'
+import type { ReferenceMap } from '../components/ui/MarkdownContent'
 import { flattenTree } from '../lib/utils'
 
 export default function ProjectPage() {
@@ -22,6 +23,17 @@ export default function ProjectPage() {
     if (!treeData?.root || !id) return []
     return flattenTree(treeData.root, id)
   }, [treeData, id])
+
+  // Build UUID → description map for resolving conjecture references
+  const refs: ReferenceMap = useMemo(() => {
+    const map: ReferenceMap = {}
+    if (overview?.tree) {
+      for (const node of overview.tree) {
+        map[node.id] = node.description
+      }
+    }
+    return map
+  }, [overview])
 
   if (projectLoading || treeLoading) {
     return (
@@ -90,7 +102,7 @@ export default function ProjectPage() {
             <span className="text-xs font-semibold uppercase text-amber-700">Project Summary</span>
           </div>
           <div className="text-sm text-gray-700">
-            <MarkdownContent>{overview.tree[0].summary}</MarkdownContent>
+            <MarkdownContent references={refs}>{overview.tree[0].summary}</MarkdownContent>
           </div>
         </div>
       )}

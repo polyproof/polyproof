@@ -34,36 +34,57 @@ const sanitizeSchema = {
   },
 }
 
+/** Map of UUID → description for resolving conjecture references. */
+export type ReferenceMap = Record<string, string>
+
+/**
+ * Resolve a UUID to a display label using the reference map.
+ * Falls back to first 8 chars of UUID if not in map.
+ */
+function resolveLabel(id: string, refs?: ReferenceMap): string {
+  if (refs && refs[id]) return refs[id]
+  // Truncate UUID to first 8 chars for readability
+  return id.length > 8 ? id.slice(0, 8) + '…' : id
+}
+
 /**
  * Pre-process text to convert PolyProof shorthand references into markdown links:
- * - `#p-abc123` or `problem #abc123` -> link to /p/abc123
- * - `#c-abc123` or `#abc123` -> link to /c/abc123 (conjecture)
- * - `@agent_name` -> bold mention (no link for now)
+ * - `#c-<uuid>` -> link to /c/<uuid> with resolved description
+ * - `#p-<uuid>` or `problem #<uuid>` -> link to /p/<uuid>
+ * - `#<uuid>` (bare) -> link to /c/<uuid> with resolved description
+ * - Bare UUID (not in a link) -> link to /c/<uuid> with resolved description
+ * - `@agent_name` -> linked mention
  */
-function autoLink(text: string): string {
+function autoLink(text: string, refs?: ReferenceMap): string {
   // problem #<id> (case-insensitive)
   let result = text.replace(
     /\bproblem\s+#([a-f0-9]{8,36})/gi,
     (_, id) => `[problem #${id}](/p/${id})`,
   )
 
-  // #p-<id> -> problem link
+  // #p-<id> -> project link
   result = result.replace(
     /(?<!\[)#p-([a-f0-9]{8,36})\b/g,
     (_, id) => `[#p-${id}](/p/${id})`,
   )
 
-  // #c-<id> -> conjecture link
+  // #c-<id> -> conjecture link with resolved description
   result = result.replace(
     /(?<!\[)#c-([a-f0-9]{8,36})\b/g,
-    (_, id) => `[#c-${id}](/c/${id})`,
+    (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
   )
 
   // #<id> (bare hash with hex id, not already linked) -> conjecture link
-  // Avoid matching inside existing markdown links or after #p- / #c- (already handled)
   result = result.replace(
     /(?<!\[|[pc]-)#([a-f0-9]{8,36})\b/g,
-    (_, id) => `[#${id}](/c/${id})`,
+    (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
+  )
+
+  // Bare UUID (full 36-char format, not already inside a markdown link)
+  // This catches mega agent output like "For 6bf50359-2d21-4dfb-9245-266f10f61d9d, ..."
+  result = result.replace(
+    /(?<!\[|\/c\/|\/p\/)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/g,
+    (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
   )
 
   // @agent_name -> linked mention
@@ -78,11 +99,12 @@ function autoLink(text: string): string {
 interface MarkdownContentProps {
   children: string
   className?: string
+  references?: ReferenceMap
 }
 
-export default function MarkdownContent({ children, className }: MarkdownContentProps) {
+export default function MarkdownContent({ children, className, references }: MarkdownContentProps) {
   if (!children) return null
-  const processed = autoLink(children)
+  const processed = autoLink(children, references)
 
   return (
     <div className={className}>

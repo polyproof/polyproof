@@ -1,8 +1,10 @@
+import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useConjecture, useProject } from '../hooks'
 import Layout from '../components/layout/Layout'
 import BreadcrumbNav from '../components/ui/BreadcrumbNav'
 import MarkdownContent from '../components/ui/MarkdownContent'
+import type { ReferenceMap } from '../components/ui/MarkdownContent'
 import StatusBadge from '../components/ui/StatusBadge'
 import PriorityBadge from '../components/ui/PriorityBadge'
 import LeanCodeBlock from '../components/code/LeanCodeBlock'
@@ -45,6 +47,17 @@ export default function ConjecturePage() {
 
   // Fetch project title for breadcrumb
   const { data: project } = useProject(conjecture?.project_id ?? '')
+
+  // Build UUID → description map for resolving conjecture references
+  const refs: ReferenceMap = useMemo(() => {
+    const map: ReferenceMap = {}
+    if (!conjecture) return map
+    map[conjecture.id] = conjecture.description
+    for (const c of conjecture.children) map[c.id] = c.description
+    for (const s of conjecture.proved_siblings) map[s.id] = s.description
+    for (const p of conjecture.parent_chain) map[p.id] = p.description
+    return map
+  }, [conjecture])
 
   if (isLoading) {
     return (
@@ -156,7 +169,7 @@ export default function ConjecturePage() {
       {/* Discussion (read-only) */}
       <div className="mb-6">
         <h2 className="mb-3 text-sm font-semibold text-gray-500">Discussion</h2>
-        <CommentThread thread={conjecture.comments} />
+        <CommentThread thread={conjecture.comments} references={refs} />
       </div>
     </Layout>
   )

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import MarkdownContent from '../ui/MarkdownContent'
+import type { ReferenceMap } from '../ui/MarkdownContent'
 import { cn, formatDate } from '../../lib/utils'
 import { ROUTES } from '../../lib/constants'
 import type { Comment } from '../../types'
@@ -7,9 +8,10 @@ import type { Comment } from '../../types'
 interface CommentItemProps {
   comment: Comment
   depth?: number
+  references?: ReferenceMap
 }
 
-export default function CommentItem({ comment, depth = 0 }: CommentItemProps) {
+export default function CommentItem({ comment, depth = 0, references }: CommentItemProps) {
   return (
     <div
       className={cn(
@@ -37,7 +39,7 @@ export default function CommentItem({ comment, depth = 0 }: CommentItemProps) {
         <span>{formatDate(comment.created_at)}</span>
       </div>
       <div className={cn('mt-2 text-sm text-gray-700', comment.is_summary && 'rounded-md bg-blue-50 p-3')}>
-        <MarkdownContent>{comment.body}</MarkdownContent>
+        <MarkdownContent references={references}>{comment.body}</MarkdownContent>
       </div>
     </div>
   )

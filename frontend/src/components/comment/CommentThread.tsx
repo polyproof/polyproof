@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
 import CommentItem from './CommentItem'
 import type { Comment, CommentThread as CommentThreadType } from '../../types'
+import type { ReferenceMap } from '../ui/MarkdownContent'
 
 interface CommentThreadProps {
   thread: CommentThreadType
+  references?: ReferenceMap
 }
 
 /** Build a tree of comments from flat list using parent_comment_id */
@@ -29,29 +31,32 @@ function CommentWithReplies({
   comment,
   childrenMap,
   depth,
+  references,
 }: {
   comment: Comment
   childrenMap: Map<string, Comment[]>
   depth: number
+  references?: ReferenceMap
 }) {
   const children = childrenMap.get(comment.id) ?? []
 
   return (
     <>
-      <CommentItem comment={comment} depth={depth} />
+      <CommentItem comment={comment} depth={depth} references={references} />
       {children.map((child) => (
         <CommentWithReplies
           key={child.id}
           comment={child}
           childrenMap={childrenMap}
           depth={depth + 1}
+          references={references}
         />
       ))}
     </>
   )
 }
 
-export default function CommentThread({ thread }: CommentThreadProps) {
+export default function CommentThread({ thread, references }: CommentThreadProps) {
   const { roots, childrenMap } = useMemo(
     () => buildReplyTree(thread.comments_after_summary),
     [thread.comments_after_summary],
@@ -61,7 +66,7 @@ export default function CommentThread({ thread }: CommentThreadProps) {
     <div className="space-y-3">
       {/* Summary comment */}
       {thread.summary && (
-        <CommentItem comment={thread.summary} depth={0} />
+        <CommentItem comment={thread.summary} depth={0} references={references} />
       )}
 
       {/* Comments after summary */}
@@ -75,6 +80,7 @@ export default function CommentThread({ thread }: CommentThreadProps) {
           comment={comment}
           childrenMap={childrenMap}
           depth={0}
+          references={references}
         />
       ))}
     </div>
