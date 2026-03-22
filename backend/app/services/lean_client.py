@@ -132,7 +132,7 @@ async def verify_sorry_proof(sorry_proof_code: str, lean_header: str | None = No
     Used during decomposition to validate the sorry-proof structure.
     The header is prepended if the sorry-proof doesn't already include imports.
     """
-    if lean_header and "import" not in sorry_proof_code[:50]:
+    if "import" not in sorry_proof_code[:50]:
         sorry_proof_code = _build_header(lean_header) + sorry_proof_code
     return await _send_to_lean(sorry_proof_code, allow_sorry=True)
 
