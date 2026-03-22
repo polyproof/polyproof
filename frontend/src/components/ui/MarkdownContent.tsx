@@ -1,5 +1,6 @@
 import 'katex/dist/katex.min.css'
 import ReactMarkdown from 'react-markdown'
+import { Link } from 'react-router-dom'
 import rehypeKatex from 'rehype-katex'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
@@ -55,35 +56,26 @@ function resolveLabel(id: string, refs?: ReferenceMap): string {
  * - Bare UUID (not in a link) -> link to /c/<uuid> with resolved description
  * - `@agent_name` -> linked mention
  */
+// Full UUID pattern: 8-4-4-4-12 hex chars
+const UUID_RE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+
 function autoLink(text: string, refs?: ReferenceMap): string {
-  // problem #<id> (case-insensitive)
+  // #c-<uuid> -> conjecture link with resolved description
   let result = text.replace(
-    /\bproblem\s+#([a-f0-9]{8,36})/gi,
-    (_, id) => `[problem #${id}](/p/${id})`,
+    new RegExp(`#c-(${UUID_RE})`, 'g'),
+    (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
   )
 
-  // #p-<id> -> project link
+  // #p-<uuid> -> project link
   result = result.replace(
-    /(?<!\[)#p-([a-f0-9]{8,36})\b/g,
+    new RegExp(`#p-(${UUID_RE})`, 'g'),
     (_, id) => `[#p-${id}](/p/${id})`,
   )
 
-  // #c-<id> -> conjecture link with resolved description
+  // Bare UUID (not inside a markdown link path or backtick code span)
+  // Catches mega agent output like "For 6bf50359-2d21-4dfb-9245-266f10f61d9d, ..."
   result = result.replace(
-    /(?<!\[)#c-([a-f0-9]{8,36})\b/g,
-    (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
-  )
-
-  // #<id> (bare hash with hex id, not already linked) -> conjecture link
-  result = result.replace(
-    /(?<!\[|[pc]-)#([a-f0-9]{8,36})\b/g,
-    (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
-  )
-
-  // Bare UUID (full 36-char format, not already inside a markdown link)
-  // This catches mega agent output like "For 6bf50359-2d21-4dfb-9245-266f10f61d9d, ..."
-  result = result.replace(
-    /(?<!\[|\/c\/|\/p\/)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/g,
+    new RegExp(`(?<!\`|/c/|/p/)(${UUID_RE})(?!\`)`, 'g'),
     (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
   )
 
@@ -145,17 +137,26 @@ export default function MarkdownContent({ children, className, references }: Mar
         },
         pre: ({ children }) => <pre className="mb-2 overflow-x-auto rounded bg-gray-100 p-3">{children}</pre>,
 
-        // Links
-        a: ({ href, children }) => (
-          <a
-            href={href}
-            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-            target={href?.startsWith('/') ? undefined : '_blank'}
-            rel={href?.startsWith('/') ? undefined : 'noopener noreferrer'}
-          >
-            {children}
-          </a>
-        ),
+        // Links — use React Router for internal paths
+        a: ({ href, children }) => {
+          if (href?.startsWith('/')) {
+            return (
+              <Link to={href} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                {children}
+              </Link>
+            )
+          }
+          return (
+            <a
+              href={href}
+              className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {children}
+            </a>
+          )
+        },
 
         // Blockquote
         blockquote: ({ children }) => (
