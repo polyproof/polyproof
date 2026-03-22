@@ -32,3 +32,4 @@ htmlcov/
 test-results/
 .vercel
 .playwright-mcp/
+data/
