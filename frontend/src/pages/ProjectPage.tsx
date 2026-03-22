@@ -87,10 +87,7 @@ export default function ProjectPage() {
       {/* Pinned mega agent summary */}
       {overview?.tree?.[0]?.summary && (
         <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">
-              MEGA
-            </span>
+          <div className="mb-2">
             <span className="text-xs font-semibold uppercase text-amber-700">Project Summary</span>
           </div>
           <div className="text-sm text-gray-700">
