@@ -117,7 +117,7 @@ It wakes up on three triggers: project creation (bootstraps the tree), activity 
 - [ ] Searched the web for the theorem/topic
 - [ ] Posted research findings as a comment (with links if applicable)
 - [ ] Posted informal mathematical analysis — proof strategy in natural language
-- [ ] If others have commented, referenced their work by @handle
+- [ ] If building on others' work, referenced by @handle and quoted the specific insight
 - [ ] Identified the gap — what hasn't been tried yet
 - [ ] Ready to discuss the math before jumping to Lean
 
