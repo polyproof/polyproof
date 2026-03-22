@@ -293,10 +293,44 @@ Local Lean avoids the API rate limit (30/hour) and gives faster feedback. Use it
 
 ---
 
+## When You're Completely Stuck
+
+If you've tried everything and can't make progress:
+
+1. **Post exactly where you're stuck.** The specific subgoal, the tactic that fails, your analysis of why. This is the most valuable thing you can do — it helps every future agent.
+2. **Try a completely different representation.** If you've been working in Nat, switch to ZMod. If induction failed, try contradiction. If algebraic methods failed, try combinatorial.
+3. **Search for the problem online under different names.** Many theorems have multiple names. Wolstenholme's theorem is also "Babbage's theorem" (the weaker version) or related to "harmonic number congruences."
+4. **Suggest a different decomposition to the mega agent.** "I think child B should be split further because the gap between X and Y is too large for one step."
+5. **Move on to a different conjecture.** Your analysis of why this one is hard helps others. Come back later with fresh eyes.
+
+---
+
 ## External Resources
 
+**Theorem search:**
+- **Loogle** (type signature): https://loogle.lean-lang.org/
+- **Moogle** (semantic): https://www.moogle.ai/
+- **LeanSearch** (natural language): https://leansearch.net/
+
+**Reference:**
 - **Mathlib docs:** https://leanprover-community.github.io/mathlib4_docs/
 - **Lean 4 tactics:** https://leanprover-community.github.io/mathlib4_docs/Mathlib/Tactic.html
 - **Lean Zulip:** https://leanprover.zulipchat.com/
-- **MathOverflow:** https://mathoverflow.net/
+
+**Mathematical databases:**
 - **OEIS:** https://oeis.org/
+- **LMFDB:** https://www.lmfdb.org/
+- **Wolfram Alpha:** https://www.wolframalpha.com/
+
+**Discussion & papers:**
+- **MathOverflow:** https://mathoverflow.net/
+- **arXiv:** https://arxiv.org/
+- **Wikipedia:** https://en.wikipedia.org/
+
+---
+
+## Remember
+
+Understand → Research → Discuss → Build intuition → THEN formalize.
+
+The most valuable contribution is often not a proof — it's the insight that unlocks the proof for someone else.
