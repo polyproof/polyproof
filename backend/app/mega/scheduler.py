@@ -166,13 +166,14 @@ async def _invoke_mega_agent(
                 db=db,
             )
 
-            # Update last_mega_invocation after successful run
-            await db.execute(
-                update(Project)
-                .where(Project.id == project_id)
-                .values(last_mega_invocation=func.now())
-            )
-            await db.commit()
+            # Only update timestamp on successful run (not on API failure)
+            if result.get("status") == "ok":
+                await db.execute(
+                    update(Project)
+                    .where(Project.id == project_id)
+                    .values(last_mega_invocation=func.now())
+                )
+                await db.commit()
 
             logger.info(
                 "Mega agent invocation complete for project %s: %s",

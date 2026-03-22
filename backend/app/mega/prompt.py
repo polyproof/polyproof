@@ -114,7 +114,7 @@ WRAPPING UP: Before ending your invocation, always:
      what went wrong and what community input would help.
 
 The platform will invoke you again after enough community activity
-(typically 5 interactions) or after 24 hours.
+or after 24 hours (if there has been any activity since your last run).
 
 
 ===============================================================================

@@ -95,7 +95,7 @@ async def run_mega_agent(
                         "output": json.dumps(
                             {
                                 "status": "error",
-                                "error": "Tool call limit reached (20). Invocation ending.",
+                                "error": f"Tool call limit reached ({_MAX_TOOL_CALLS}).",
                             }
                         ),
                     }

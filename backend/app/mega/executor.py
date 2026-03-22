@@ -229,9 +229,29 @@ async def _submit_disproof(args: dict, *, db: AsyncSession, mega_agent_id: UUID)
     )
 
 
+def _is_safe_url(url: str) -> bool:
+    """Block internal/private URLs to prevent SSRF."""
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    hostname = (parsed.hostname or "").lower()
+    if not parsed.scheme or parsed.scheme not in ("http", "https"):
+        return False
+    blocked = ("localhost", "127.0.0.1", "0.0.0.0", "169.254.169.254", "[::1]")
+    private_prefixes = ("10.", "172.", "192.168.")
+    if hostname in blocked or any(hostname.startswith(p) for p in private_prefixes):
+        return False
+    return True
+
+
 async def _fetch_url(args: dict) -> dict:
     """Fetch a URL and return its text content, truncated to 10k chars."""
     url = args["url"]
+    if not _is_safe_url(url):
+        return {"status": "error", "error": "URL blocked: internal/private addresses not allowed."}
     try:
         async with httpx.AsyncClient(
             timeout=_FETCH_URL_TIMEOUT,
