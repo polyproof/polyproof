@@ -1,222 +1,23 @@
-import { useMemo, useCallback, useEffect } from 'react'
-import {
-  ReactFlow,
-  useNodesState,
-  useEdgesState,
-  useReactFlow,
-  ReactFlowProvider,
-  type Node,
-  type Edge,
-} from '@xyflow/react'
-import dagre from 'dagre'
-import '@xyflow/react/dist/style.css'
-import { useNavigate } from 'react-router-dom'
-import { Maximize2, Zap, Filter } from 'lucide-react'
-import ConjectureNodeComponent, { type ConjectureNodeData } from './ConjectureNode'
-import MobileTreeList from './MobileTreeList'
-import { cn } from '../../lib/utils'
+import { Link } from 'react-router-dom'
+import { ChevronRight, ChevronDown, MessageSquare, Check, X } from 'lucide-react'
+import { cn, truncate } from '../../lib/utils'
 import { ROUTES } from '../../lib/constants'
 import { useUIStore } from '../../store/ui'
-import type { TreeNode, ConjectureStatus } from '../../types'
+import type { TreeNode, ConjectureStatus, Priority } from '../../types'
 
-const NODE_WIDTH = 240
-const NODE_HEIGHT = 80
-
-const nodeTypes = {
-  conjecture: ConjectureNodeComponent,
+const statusDot: Record<ConjectureStatus, string> = {
+  open: 'bg-gray-400',
+  decomposed: 'bg-blue-500',
+  proved: 'bg-green-500',
+  disproved: 'bg-red-500',
+  invalid: 'bg-gray-300',
 }
 
-function getLayoutedElements(
-  nodes: Node[],
-  edges: Edge[],
-): { nodes: Node[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph()
-  g.setGraph({ rankdir: 'TB', ranksep: 60, nodesep: 40 })
-  g.setDefaultEdgeLabel(() => ({}))
-
-  nodes.forEach((node) => {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
-  })
-
-  edges.forEach((edge) => {
-    g.setEdge(edge.source, edge.target)
-  })
-
-  dagre.layout(g)
-
-  const layoutedNodes = nodes.map((node) => {
-    const pos = g.node(node.id)
-    return {
-      ...node,
-      position: {
-        x: pos.x - NODE_WIDTH / 2,
-        y: pos.y - NODE_HEIGHT / 2,
-      },
-    }
-  })
-
-  return { nodes: layoutedNodes, edges }
-}
-
-interface ProofTreeInnerProps {
-  tree: TreeNode[]
-  highlightCritical: boolean
-  statusFilter: Set<ConjectureStatus>
-  collapsed: Set<string>
-  onToggleCollapse: (id: string) => void
-  onSetHighlightCritical: (on: boolean) => void
-  onToggleStatusFilter: (status: ConjectureStatus) => void
-}
-
-function ProofTreeInner({
-  tree,
-  highlightCritical,
-  statusFilter,
-  collapsed,
-  onToggleCollapse,
-  onSetHighlightCritical,
-  onToggleStatusFilter,
-}: ProofTreeInnerProps) {
-  const navigate = useNavigate()
-  const { fitView } = useReactFlow()
-
-  const handleNodeClick = useCallback(
-    (id: string) => {
-      navigate(ROUTES.CONJECTURE(id))
-    },
-    [navigate],
-  )
-
-  // Filter out children of collapsed nodes
-  const visibleNodes = useMemo(() => {
-    const collapsedAncestors = new Set<string>()
-
-    // Find all nodes that are descendants of collapsed nodes
-    function markHidden(nodeId: string) {
-      const children = tree.filter((n) => n.parent_id === nodeId)
-      for (const child of children) {
-        collapsedAncestors.add(child.id)
-        markHidden(child.id)
-      }
-    }
-
-    for (const id of collapsed) {
-      markHidden(id)
-    }
-
-    return tree.filter((n) => !collapsedAncestors.has(n.id))
-  }, [tree, collapsed])
-
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
-    const rfNodes: Node[] = visibleNodes.map((node) => {
-      const isDimmed =
-        (statusFilter.size > 0 && !statusFilter.has(node.status)) ||
-        (highlightCritical && node.priority !== 'critical' && node.status !== 'proved')
-
-      return {
-        id: node.id,
-        type: 'conjecture',
-        position: { x: 0, y: 0 },
-        data: {
-          id: node.id,
-          lean_statement: node.lean_statement,
-          status: node.status,
-          priority: node.priority,
-          comment_count: node.comment_count,
-          child_count: node.child_count,
-          proved_child_count: node.proved_child_count,
-          collapsed: collapsed.has(node.id),
-          dimmed: isDimmed,
-          onToggleCollapse,
-          onNodeClick: handleNodeClick,
-        } satisfies ConjectureNodeData,
-      }
-    })
-
-    const visibleIds = new Set(visibleNodes.map((n) => n.id))
-    const rfEdges: Edge[] = visibleNodes
-      .filter((n) => n.parent_id && visibleIds.has(n.parent_id))
-      .map((n) => ({
-        id: `${n.parent_id}-${n.id}`,
-        source: n.parent_id!,
-        target: n.id,
-        type: 'smoothstep',
-        style: { stroke: '#94a3b8', strokeWidth: 1.5 },
-      }))
-
-    return getLayoutedElements(rfNodes, rfEdges)
-  }, [visibleNodes, collapsed, highlightCritical, statusFilter, onToggleCollapse, handleNodeClick])
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
-
-  // Update nodes/edges when data changes
-  useEffect(() => {
-    setNodes(initialNodes)
-    setEdges(initialEdges)
-  }, [initialNodes, initialEdges, setNodes, setEdges])
-
-  const statusOptions: ConjectureStatus[] = ['open', 'decomposed', 'proved', 'disproved', 'invalid']
-
-  return (
-    <div>
-      {/* Toolbar */}
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => fitView({ padding: 0.1 })}
-          className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-        >
-          <Maximize2 className="h-3 w-3" />
-          Fit
-        </button>
-        <button
-          onClick={() => onSetHighlightCritical(!highlightCritical)}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium',
-            highlightCritical
-              ? 'border-yellow-300 bg-yellow-50 text-yellow-800'
-              : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
-          )}
-        >
-          <Zap className="h-3 w-3" />
-          Critical Path
-        </button>
-        <div className="relative inline-flex items-center gap-1">
-          <Filter className="h-3 w-3 text-gray-500" />
-          {statusOptions.map((s) => (
-            <button
-              key={s}
-              onClick={() => onToggleStatusFilter(s)}
-              className={cn(
-                'rounded-md px-2 py-1 text-xs capitalize',
-                statusFilter.has(s)
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-              )}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tree */}
-      <div className="h-[500px] rounded-lg border border-gray-200 bg-white">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.1 }}
-          minZoom={0.1}
-          maxZoom={2}
-          proOptions={{ hideAttribution: true }}
-        />
-      </div>
-    </div>
-  )
+const priorityIndicator: Record<Priority, string> = {
+  critical: 'border-l-red-500',
+  high: 'border-l-orange-400',
+  normal: 'border-l-transparent',
+  low: 'border-l-transparent',
 }
 
 interface ProofTreeProps {
@@ -224,40 +25,89 @@ interface ProofTreeProps {
 }
 
 export default function ProofTree({ tree }: ProofTreeProps) {
-  const {
-    highlightCritical,
-    statusFilter,
-    treeCollapsed,
-    toggleCollapse,
-    setHighlightCritical,
-    toggleStatusFilter,
-  } = useUIStore()
+  const { treeCollapsed, toggleCollapse } = useUIStore()
+
+  // Build parent -> children map
+  const childrenMap = new Map<string | null, TreeNode[]>()
+  for (const node of tree) {
+    const parentId = node.parent_id
+    if (!childrenMap.has(parentId)) {
+      childrenMap.set(parentId, [])
+    }
+    childrenMap.get(parentId)!.push(node)
+  }
+
+  const rootNodes = childrenMap.get(null) ?? []
+
+  function renderNode(node: TreeNode, depth: number): React.ReactNode {
+    const children = childrenMap.get(node.id) ?? []
+    const isCollapsed = treeCollapsed.has(node.id)
+    const hasChildren = children.length > 0
+    const isInvalid = node.status === 'invalid'
+
+    return (
+      <div key={node.id}>
+        <div
+          className={cn(
+            'flex items-center gap-2 border-b border-gray-100 border-l-2 py-2.5 pr-3 transition-colors hover:bg-gray-50',
+            priorityIndicator[node.priority],
+            isInvalid && 'opacity-50',
+          )}
+          style={{ paddingLeft: `${depth * 24 + 12}px` }}
+        >
+          {/* Collapse toggle */}
+          {hasChildren ? (
+            <button
+              onClick={() => toggleCollapse(node.id)}
+              className="shrink-0 rounded p-0.5 hover:bg-gray-200"
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+              )}
+            </button>
+          ) : (
+            <span className="w-[22px] shrink-0" />
+          )}
+
+          {/* Status dot */}
+          <div className={cn('h-2.5 w-2.5 shrink-0 rounded-full', statusDot[node.status])} />
+
+          {/* Description (clickable) */}
+          <Link
+            to={ROUTES.CONJECTURE(node.id)}
+            className={cn(
+              'min-w-0 flex-1 text-sm hover:text-blue-600',
+              isInvalid && 'text-gray-400 line-through',
+              !isInvalid && 'text-gray-800',
+            )}
+          >
+            {truncate(node.description || node.lean_statement, 80)}
+          </Link>
+
+          {/* Status icons */}
+          {node.status === 'proved' && <Check className="h-3.5 w-3.5 shrink-0 text-green-600" />}
+          {node.status === 'disproved' && <X className="h-3.5 w-3.5 shrink-0 text-red-600" />}
+
+          {/* Comment count */}
+          {node.comment_count > 0 && (
+            <span className="inline-flex shrink-0 items-center gap-0.5 text-xs text-gray-400">
+              <MessageSquare className="h-3 w-3" />
+              {node.comment_count}
+            </span>
+          )}
+        </div>
+
+        {/* Children */}
+        {hasChildren && !isCollapsed && children.map((child) => renderNode(child, depth + 1))}
+      </div>
+    )
+  }
 
   return (
-    <>
-      {/* Desktop: react-flow tree */}
-      <div className="hidden md:block">
-        <ReactFlowProvider>
-          <ProofTreeInner
-            tree={tree}
-            highlightCritical={highlightCritical}
-            statusFilter={statusFilter}
-            collapsed={treeCollapsed}
-            onToggleCollapse={toggleCollapse}
-            onSetHighlightCritical={setHighlightCritical}
-            onToggleStatusFilter={toggleStatusFilter}
-          />
-        </ReactFlowProvider>
-      </div>
-
-      {/* Mobile: indented list */}
-      <div className="md:hidden">
-        <MobileTreeList
-          nodes={tree}
-          collapsed={treeCollapsed}
-          onToggleCollapse={toggleCollapse}
-        />
-      </div>
-    </>
+    <div className="rounded-lg border border-gray-200 bg-white">
+      {rootNodes.map((node) => renderNode(node, 0))}
+    </div>
   )
 }
