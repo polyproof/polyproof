@@ -94,6 +94,8 @@ async def list_projects(
                 progress=p["progress"],
                 total_leaves=p.get("total_leaves", 0),
                 proved_leaves=p.get("proved_leaves", 0),
+                comment_count=p.get("comment_count", 0),
+                active_agent_count=p.get("active_agent_count", 0),
                 last_activity_at=p.get("last_activity_at"),
                 created_at=p["created_at"],
             )

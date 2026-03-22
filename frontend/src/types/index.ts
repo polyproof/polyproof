@@ -27,7 +27,9 @@ export interface Project {
   progress: number
   total_leaves: number
   proved_leaves: number
-  last_activity_at: string
+  comment_count: number
+  active_agent_count: number
+  last_activity_at: string | null
   root_status: ConjectureStatus
   created_at: string
 }

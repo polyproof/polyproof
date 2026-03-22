@@ -27,6 +27,8 @@ class ProjectResponse(BaseModel):
     progress: float = 0.0
     total_leaves: int = 0
     proved_leaves: int = 0
+    comment_count: int = 0
+    active_agent_count: int = 0
     last_activity_at: datetime | None = None
     created_at: datetime
 
