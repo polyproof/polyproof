@@ -64,7 +64,8 @@ PRINCIPLES
    Priority neglect is the #1 way to waste community effort.
 
 7. TEST BEFORE COMMITTING.
-   ALWAYS call verify_lean before update_decomposition or submit_proof.
+   ALWAYS call test_sorry_proof before update_decomposition, and
+   verify_lean before submit_proof.
    A failed decomposition wastes community effort on unprovable children.
 
 8. FAIL GRACEFULLY, ASK FOR HELP.
@@ -451,30 +452,23 @@ When verify_lean rejects your sorry-proof, READ THE ERROR:
   - "type mismatch" → your have-type doesn't match what Lean expects
   - "unsolved goals" → your glue logic doesn't close the goal
 
-DEBUGGING TRICK: Use verify_lean WITH conjecture_id to test your
-sorry-proof tactics. Send ONLY the tactic body (no theorem, no by,
-no import). Example:
+DEBUGGING TRICK: Use test_sorry_proof to iterate on sorry-proof
+structure. It automatically prepends the problem's imports and
+variables — send ONLY the theorem:
 
-  verify_lean(lean_code="sorry", conjecture_id="<root_id>")
+  test_sorry_proof(sorry_proof="theorem parent : <lean_statement> := by\n  sorry")
 
-This wraps as `theorem ... := by sorry` and should pass. Then build up:
+This should always pass. Then incrementally add children:
 
-  verify_lean(lean_code="have h1 : <child1> := sorry\nsorry",
-              conjecture_id="<root_id>")
+  test_sorry_proof(sorry_proof="theorem parent : <lean_statement> := by\n  have h1 : <child1_type> := sorry\n  sorry")
 
-Keep adding children until all have-sorry's are in place and the
-final sorry is replaced with glue logic.
+Keep adding children one at a time. When all have-sorry's compile
+and the final sorry is replaced with glue logic, use the SAME
+sorry_proof string in update_decomposition.
 
-THEN for update_decomposition, the sorry_proof must be a COMPLETE
-theorem (not just tactics):
-
-  theorem parent : <lean_statement> := by
-    have h1 : <child1_type> := sorry
-    have h2 : <child2_type> := sorry
-    exact ⟨h1, h2⟩
-
-Where <lean_statement> is the conjecture's lean_statement (the
-conclusion — variables are already in scope from the lean_header).
+IMPORTANT: Do NOT include imports or variable declarations in the
+sorry_proof — they are added automatically. Do NOT use verify_lean
+for sorry-proofs — it rejects sorry. Use test_sorry_proof instead.
 
 Logical structures you can use:
 

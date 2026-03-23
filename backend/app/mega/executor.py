@@ -33,7 +33,9 @@ async def execute_tool(
     """
     try:
         if tool_name == "verify_lean":
-            return await _verify_lean(arguments, db=db, project_id=project_id)
+            return await _verify_lean(arguments, db=db)
+        elif tool_name == "test_sorry_proof":
+            return await _test_sorry_proof(arguments, db=db, project_id=project_id)
         elif tool_name == "update_decomposition":
             return await _update_decomposition(arguments, db=db, mega_agent_id=mega_agent_id)
         elif tool_name == "revert_decomposition":
@@ -62,19 +64,14 @@ async def execute_tool(
         }
 
 
-async def _verify_lean(args: dict, *, db: AsyncSession, project_id: UUID) -> dict:
-    """Verify Lean code privately. Nothing stored."""
-    from app.services.proof_service import _get_lean_header
-
+async def _verify_lean(args: dict, *, db: AsyncSession) -> dict:
+    """Verify Lean code privately. Nothing stored. Sorry is rejected."""
     lean_code = args["lean_code"]
     conjecture_id = args.get("conjecture_id")
 
-    # Mega agent may test sorry-proofs before decomposing.
-    # Allow sorry in both paths so it can iterate on decomposition structure.
-    allow_sorry = "sorry" in lean_code
-
     if conjecture_id:
         from app.models.conjecture import Conjecture
+        from app.services.proof_service import _get_lean_header
 
         conjecture = await db.get(Conjecture, UUID(conjecture_id))
         if not conjecture:
@@ -85,16 +82,24 @@ async def _verify_lean(args: dict, *, db: AsyncSession, project_id: UUID) -> dic
             tactics=lean_code,
             conjecture_id=UUID(conjecture_id),
             lean_header=lean_header,
-            allow_sorry=allow_sorry,
         )
     else:
-        if allow_sorry:
-            # Include the problem's lean_header so imports/variables are available
-            lean_header = await _get_lean_header(db, project_id)
-            result = await lean_client.verify_sorry_proof(lean_code, lean_header=lean_header)
-        else:
-            result = await lean_client.verify_freeform(lean_code)
+        result = await lean_client.verify_freeform(lean_code)
 
+    return {"status": result.status, "error": result.error}
+
+
+async def _test_sorry_proof(args: dict, *, db: AsyncSession, project_id: UUID) -> dict:
+    """Test a sorry-proof before decomposition. Sorry is allowed.
+
+    Prepends the problem's lean_header (imports + variables) automatically.
+    The mega agent sends only the theorem body.
+    """
+    from app.services.proof_service import _get_lean_header
+
+    sorry_proof = args["sorry_proof"]
+    lean_header = await _get_lean_header(db, project_id)
+    result = await lean_client.verify_sorry_proof(sorry_proof, lean_header=lean_header)
     return {"status": result.status, "error": result.error}
 
 

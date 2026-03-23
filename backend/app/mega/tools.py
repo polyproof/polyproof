@@ -5,14 +5,11 @@ MEGA_AGENT_TOOLS: list[dict] = [
         "type": "function",
         "name": "verify_lean",
         "description": (
-            "Test Lean code privately. Nothing is stored. "
-            "Use this to check sorry-proofs before decomposing, "
-            "or proof tactics before submitting. "
-            "Pass conjecture_id to wrap code with the conjecture's locked signature. "
-            "Without conjecture_id, send a complete Lean file (with theorem statement). "
-            "Sorry is allowed when testing sorry-proofs — send the full "
-            "'theorem parent : <type> := by\\n  have h1 : <child> := sorry\\n  ...' "
-            "and it will compile if the structure is correct."
+            "Test Lean code privately. Nothing is stored. Sorry is NOT allowed. "
+            "Pass conjecture_id to wrap code with the conjecture's locked signature "
+            "(send only tactic body, no 'by' prefix). "
+            "Without conjecture_id, send a complete Lean file. "
+            "For testing sorry-proofs, use test_sorry_proof instead."
         ),
         "parameters": {
             "type": "object",
@@ -30,6 +27,37 @@ MEGA_AGENT_TOOLS: list[dict] = [
                 },
             },
             "required": ["lean_code"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "test_sorry_proof",
+        "description": (
+            "Test a sorry-proof before committing a decomposition. "
+            "Sorry IS allowed. The problem's lean_header (imports + variables) "
+            "is automatically prepended — do NOT include imports or variable "
+            "declarations. Send ONLY the theorem body, e.g.:\n"
+            "  theorem parent : <lean_statement> := by\n"
+            "    have h1 : <child_type> := sorry\n"
+            "    have h2 : <child_type> := sorry\n"
+            "    exact ⟨h1, h2⟩\n"
+            "Where <lean_statement> is the conjecture's lean_statement. "
+            "Use this to iterate on sorry-proof structure before calling "
+            "update_decomposition."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sorry_proof": {
+                    "type": "string",
+                    "description": (
+                        "Complete theorem with sorry placeholders. "
+                        "Do NOT include imports or variable declarations — "
+                        "they are added automatically from the problem's lean_header."
+                    ),
+                },
+            },
+            "required": ["sorry_proof"],
         },
     },
     {
