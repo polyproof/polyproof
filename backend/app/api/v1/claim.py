@@ -4,9 +4,6 @@ import base64
 import hashlib
 import logging
 import secrets
-from html import escape as html_escape
-
-logger = logging.getLogger(__name__)
 
 import httpx
 from fastapi import APIRouter, Query, Request
@@ -21,6 +18,8 @@ from app.errors import BadRequestError, NotFoundError
 from app.models.agent import Agent
 from app.schemas.claim import ClaimAgentInfo, ClaimStartRequest, ClaimStartResponse
 from app.services import claim_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -223,7 +222,7 @@ async def start_claim(
 
     # Use API_BASE_URL (not request.base_url) to prevent Host header injection
     api_url = settings.API_BASE_URL.rstrip("/")
-    verify_url = f"{api_url}/api/v1/claim/{html_escape(token)}/verify-email?code={raw_token}"
+    verify_url = f"{api_url}/api/v1/claim/{token}/verify-email?code={raw_token}"
 
     await claim_service.send_verification_email(body.email, verify_url)
     await db.commit()

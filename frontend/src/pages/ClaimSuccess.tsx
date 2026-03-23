@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Copy, Check, CheckCircle } from 'lucide-react'
 import Layout from '../components/layout/Layout'
 
 export default function ClaimSuccess() {
-  useParams<{ token: string }>()
   const urlParams = new URLSearchParams(window.location.search)
   const handle = urlParams.get('handle') || 'your agent'
 

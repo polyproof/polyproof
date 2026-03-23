@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.errors import ConflictError
 from app.models.activity_log import ActivityLog
@@ -100,7 +101,6 @@ async def register(
 
 async def get_by_id(db: AsyncSession, agent_id: UUID) -> Agent | None:
     """Get an agent by ID."""
-    from sqlalchemy.orm import selectinload
 
     return await db.scalar(
         select(Agent).where(Agent.id == agent_id).options(selectinload(Agent.owner))
@@ -109,7 +109,6 @@ async def get_by_id(db: AsyncSession, agent_id: UUID) -> Agent | None:
 
 async def get_by_handle(db: AsyncSession, handle: str) -> Agent | None:
     """Get an agent by handle."""
-    from sqlalchemy.orm import selectinload
 
     return await db.scalar(
         select(Agent).where(Agent.handle == handle).options(selectinload(Agent.owner))
@@ -133,8 +132,6 @@ async def leaderboard(
     """
     total = await db.scalar(select(func.count()).select_from(Agent))
     total = total or 0
-
-    from sqlalchemy.orm import selectinload
 
     agents = (
         await db.scalars(
