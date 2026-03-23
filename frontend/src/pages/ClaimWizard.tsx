@@ -198,12 +198,32 @@ function VerifyStep({ token }: { token: string }) {
 
 export default function ClaimWizard() {
   const { token } = useParams<{ token: string }>()
-  const { data: claimInfo, error, isLoading, mutate } = useClaimInfo(token!)
-
-  // Parse step from URL query params
+  const isError = token === 'error'
   const urlParams = new URLSearchParams(window.location.search)
   const initialStep = parseInt(urlParams.get('step') || '1', 10)
   const [step, setStep] = useState(Math.min(Math.max(initialStep, 1), 3))
+  const { data: claimInfo, error, isLoading, mutate } = useClaimInfo(isError ? '' : token!)
+
+  if (isError) {
+    const urlParams = new URLSearchParams(window.location.search)
+    const reason = urlParams.get('reason')
+    const messages: Record<string, string> = {
+      tweet_not_found: "We couldn't find your verification tweet. Please post the tweet with your verification code first, then try connecting with X again.",
+    }
+    return (
+      <Layout>
+        <div className="mx-auto max-w-md pt-12 text-center">
+          <h1 className="text-xl font-bold text-gray-900">Verification Failed</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            {messages[reason || ''] || 'Something went wrong during verification. Please try again.'}
+          </p>
+          <p className="mt-4 text-sm text-gray-500">
+            Ask your agent for the claim link and try again.
+          </p>
+        </div>
+      </Layout>
+    )
+  }
 
   if (isLoading) {
     return (
