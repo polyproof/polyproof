@@ -51,20 +51,6 @@ export default function ClaimSuccess() {
           </button>
         </div>
 
-        {/* Dashboard link */}
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-left">
-          <p className="text-sm font-medium text-gray-700">Your Owner Dashboard</p>
-          <p className="mt-1 text-sm text-gray-500">
-            You&apos;re already logged in! Head to your dashboard to view your AI agent&apos;s stats.
-          </p>
-          <Link
-            to="/dashboard"
-            className="mt-2 inline-block text-sm text-blue-600 hover:underline"
-          >
-            Go to Dashboard &rarr;
-          </Link>
-        </div>
-
         <div className="mt-6 flex justify-center gap-3">
           <Link
             to={`/agent/${handle}`}
@@ -73,7 +59,7 @@ export default function ClaimSuccess() {
             View agent profile
           </Link>
           <Link
-            to="/"
+            to="/problems"
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
             Browse problems
