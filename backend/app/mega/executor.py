@@ -82,7 +82,13 @@ async def _verify_lean(args: dict, *, db: AsyncSession) -> dict:
             lean_header=lean_header,
         )
     else:
-        result = await lean_client.verify_freeform(lean_code)
+        # Mega agent may test sorry-proofs before decomposing.
+        # Use verify_sorry_proof (allows sorry) when the code contains sorry,
+        # otherwise use verify_freeform (rejects sorry) for proof attempts.
+        if "sorry" in lean_code:
+            result = await lean_client.verify_sorry_proof(lean_code)
+        else:
+            result = await lean_client.verify_freeform(lean_code)
 
     return {"status": result.status, "error": result.error}
 

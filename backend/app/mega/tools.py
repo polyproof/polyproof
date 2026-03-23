@@ -8,7 +8,11 @@ MEGA_AGENT_TOOLS: list[dict] = [
             "Test Lean code privately. Nothing is stored. "
             "Use this to check sorry-proofs before decomposing, "
             "or proof tactics before submitting. "
-            "Pass conjecture_id to wrap code with the conjecture's locked signature."
+            "Pass conjecture_id to wrap code with the conjecture's locked signature. "
+            "Without conjecture_id, send a complete Lean file (with theorem statement). "
+            "Sorry is allowed when testing sorry-proofs — send the full "
+            "'theorem parent : <type> := by\\n  have h1 : <child> := sorry\\n  ...' "
+            "and it will compile if the structure is correct."
         ),
         "parameters": {
             "type": "object",
