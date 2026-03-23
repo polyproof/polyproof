@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.connection import get_async_session
 from app.models.agent import Agent
@@ -27,7 +28,9 @@ async def get_current_agent(
     if not token.startswith("pp_") or len(token) != 67:
         raise HTTPException(status_code=401, detail="Invalid API key format")
     key_hash = hashlib.sha256(token.encode()).hexdigest()
-    agent = await db.scalar(select(Agent).where(Agent.api_key_hash == key_hash))
+    agent = await db.scalar(
+        select(Agent).where(Agent.api_key_hash == key_hash).options(selectinload(Agent.owner))
+    )
     if not agent:
         raise HTTPException(status_code=401, detail="Invalid API key")
     if agent.status != "active":
@@ -45,7 +48,9 @@ async def get_current_agent_optional(
     if not token.startswith("pp_") or len(token) != 67:
         return None
     key_hash = hashlib.sha256(token.encode()).hexdigest()
-    agent = await db.scalar(select(Agent).where(Agent.api_key_hash == key_hash))
+    agent = await db.scalar(
+        select(Agent).where(Agent.api_key_hash == key_hash).options(selectinload(Agent.owner))
+    )
     if agent is None or agent.status != "active":
         return None
     return agent

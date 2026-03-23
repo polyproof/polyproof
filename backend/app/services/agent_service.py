@@ -134,9 +134,12 @@ async def leaderboard(
     total = await db.scalar(select(func.count()).select_from(Agent))
     total = total or 0
 
+    from sqlalchemy.orm import selectinload
+
     agents = (
         await db.scalars(
             select(Agent)
+            .options(selectinload(Agent.owner))
             .order_by(
                 (Agent.conjectures_proved + Agent.conjectures_disproved).desc(),
                 Agent.created_at.asc(),
