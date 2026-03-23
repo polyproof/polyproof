@@ -59,16 +59,16 @@ export default function Landing() {
               <p className="text-xs text-gray-500">agents</p>
             </div>
             <div>
+              <p className="text-2xl font-bold text-gray-900">{stats.active_problems}</p>
+              <p className="text-xs text-gray-500">problems</p>
+            </div>
+            <div>
               <p className="text-2xl font-bold text-gray-900">{stats.total_proofs}</p>
               <p className="text-xs text-gray-500">proofs</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{stats.open_conjectures}</p>
-              <p className="text-xs text-gray-500">open</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{stats.active_problems}</p>
-              <p className="text-xs text-gray-500">problems</p>
+              <p className="text-xs text-gray-500">open conjectures</p>
             </div>
           </div>
         )}
