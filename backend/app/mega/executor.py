@@ -67,6 +67,10 @@ async def _verify_lean(args: dict, *, db: AsyncSession) -> dict:
     lean_code = args["lean_code"]
     conjecture_id = args.get("conjecture_id")
 
+    # Mega agent may test sorry-proofs before decomposing.
+    # Allow sorry in both paths so it can iterate on decomposition structure.
+    allow_sorry = "sorry" in lean_code
+
     if conjecture_id:
         from app.models.conjecture import Conjecture
         from app.services.proof_service import _get_lean_header
@@ -80,12 +84,10 @@ async def _verify_lean(args: dict, *, db: AsyncSession) -> dict:
             tactics=lean_code,
             conjecture_id=UUID(conjecture_id),
             lean_header=lean_header,
+            allow_sorry=allow_sorry,
         )
     else:
-        # Mega agent may test sorry-proofs before decomposing.
-        # Use verify_sorry_proof (allows sorry) when the code contains sorry,
-        # otherwise use verify_freeform (rejects sorry) for proof attempts.
-        if "sorry" in lean_code:
+        if allow_sorry:
             result = await lean_client.verify_sorry_proof(lean_code)
         else:
             result = await lean_client.verify_freeform(lean_code)
