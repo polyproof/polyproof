@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import secrets
+from html import escape as html_escape
 
 import httpx
 from fastapi import APIRouter, Query, Request
@@ -28,9 +29,10 @@ def _get_serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(settings.SESSION_SECRET)
 
 
-def _set_session_cookie(response: RedirectResponse, owner_id: str) -> None:
+def _set_session_cookie(response: RedirectResponse, session_data: dict) -> None:
+    """Set a signed session cookie with dict data (always a dict, never a bare string)."""
     serializer = _get_serializer()
-    signed = serializer.dumps(owner_id)
+    signed = serializer.dumps(session_data)
     response.set_cookie(
         key=_SESSION_COOKIE,
         value=signed,
@@ -41,15 +43,19 @@ def _set_session_cookie(response: RedirectResponse, owner_id: str) -> None:
     )
 
 
-def _get_owner_id_from_cookie(request: Request) -> str | None:
+def _load_session(request: Request) -> dict | None:
+    """Load and verify the session cookie. Returns dict or None."""
     cookie = request.cookies.get(_SESSION_COOKIE)
     if not cookie:
         return None
     serializer = _get_serializer()
     try:
-        return serializer.loads(cookie, max_age=_SESSION_MAX_AGE)
+        data = serializer.loads(cookie, max_age=_SESSION_MAX_AGE)
     except BadSignature:
         return None
+    if not isinstance(data, dict):
+        return None
+    return data
 
 
 def _generate_pkce() -> tuple[str, str]:
@@ -72,28 +78,29 @@ async def twitter_callback(
     db: DbSession = ...,  # type: ignore[assignment]
 ) -> RedirectResponse:
     """Handle Twitter OAuth callback."""
-    cookie = request.cookies.get(_SESSION_COOKIE)
-    if not cookie:
+    session = _load_session(request)
+    if not session:
         raise BadRequestError("Session expired. Please restart the claiming process.")
 
-    serializer = _get_serializer()
-    try:
-        session_data = serializer.loads(cookie, max_age=_SESSION_MAX_AGE)
-    except BadSignature:
-        raise BadRequestError("Invalid session. Please restart the claiming process.")
+    owner_id = session.get("owner_id")
+    code_verifier = session.get("code_verifier")
+    claim_token_hash = session.get("claim_token_hash")
+    expected_state = session.get("oauth_state")
 
-    if isinstance(session_data, str):
+    if not owner_id or not code_verifier or not claim_token_hash:
         raise BadRequestError("Invalid session state. Please restart the claiming process.")
 
-    owner_id = session_data.get("owner_id")
-    code_verifier = session_data.get("code_verifier")
-    if not owner_id or not code_verifier:
-        raise BadRequestError("Invalid session state. Please restart the claiming process.")
+    # Validate OAuth state parameter (CSRF protection)
+    if not expected_state or state != expected_state:
+        raise BadRequestError("Invalid OAuth state. Please restart the claiming process.")
 
-    # state is the claim_token_hash — find the agent
-    agent = await db.scalar(select(Agent).where(Agent.claim_token_hash == state))
+    # Find the agent by claim_token_hash (stored in session, not from URL)
+    agent = await db.scalar(select(Agent).where(Agent.claim_token_hash == claim_token_hash))
     if not agent:
         raise NotFoundError("Agent")
+
+    if agent.is_claimed:
+        raise BadRequestError("Agent is already claimed")
 
     # Exchange code for access token
     async with httpx.AsyncClient() as client:
@@ -154,9 +161,9 @@ async def twitter_callback(
     await claim_service.claim_agent(db, agent, owner_id)
     await db.commit()
 
-    redirect_url = f"{settings.FRONTEND_URL}/claim/{state}/success?handle={agent.handle}"
+    redirect_url = f"{settings.FRONTEND_URL}/claim/success?handle={agent.handle}"
     response = RedirectResponse(url=redirect_url, status_code=302)
-    _set_session_cookie(response, owner_id)
+    _set_session_cookie(response, {"owner_id": owner_id})
     return response
 
 
@@ -197,8 +204,9 @@ async def start_claim(
     owner = await claim_service.get_or_create_owner(db, body.email)
     raw_token = await claim_service.create_verification_token(db, owner.id, claim_token_hash)
 
-    backend_url = str(request.base_url).rstrip("/")
-    verify_url = f"{backend_url}/api/v1/claim/{token}/verify-email?code={raw_token}"
+    # Use API_BASE_URL (not request.base_url) to prevent Host header injection
+    api_url = settings.API_BASE_URL.rstrip("/")
+    verify_url = f"{api_url}/api/v1/claim/{html_escape(token)}/verify-email?code={raw_token}"
 
     await claim_service.send_verification_email(body.email, verify_url)
     await db.commit()
@@ -223,7 +231,7 @@ async def verify_email(
 
     redirect_url = f"{settings.FRONTEND_URL}/claim/{token}?step=2"
     response = RedirectResponse(url=redirect_url, status_code=302)
-    _set_session_cookie(response, str(owner.id))
+    _set_session_cookie(response, {"owner_id": str(owner.id)})
     return response
 
 
@@ -239,33 +247,35 @@ async def twitter_auth(
     if agent.is_claimed:
         raise BadRequestError("Agent is already claimed")
 
-    owner_id = _get_owner_id_from_cookie(request)
-    if not owner_id:
+    session = _load_session(request)
+    if not session or not session.get("owner_id"):
         raise BadRequestError("Email verification required before Twitter auth")
 
     code_verifier, code_challenge = _generate_pkce()
-
     claim_token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    # Generate random state nonce for CSRF protection
+    oauth_state = secrets.token_urlsafe(32)
+
     twitter_url = (
         f"https://twitter.com/i/oauth2/authorize"
         f"?response_type=code"
         f"&client_id={settings.TWITTER_CLIENT_ID}"
         f"&redirect_uri={settings.TWITTER_REDIRECT_URI}"
         f"&scope=tweet.read%20users.read"
-        f"&state={claim_token_hash}"
+        f"&state={oauth_state}"
         f"&code_challenge={code_challenge}"
         f"&code_challenge_method=S256"
     )
 
     response = RedirectResponse(url=twitter_url, status_code=302)
-    serializer = _get_serializer()
-    session_data = serializer.dumps({"owner_id": owner_id, "code_verifier": code_verifier})
-    response.set_cookie(
-        key=_SESSION_COOKIE,
-        value=session_data,
-        max_age=_SESSION_MAX_AGE,
-        httponly=True,
-        secure=settings.API_ENV == "production",
-        samesite="lax",
+    _set_session_cookie(
+        response,
+        {
+            "owner_id": session["owner_id"],
+            "code_verifier": code_verifier,
+            "claim_token_hash": claim_token_hash,
+            "oauth_state": oauth_state,
+        },
     )
     return response

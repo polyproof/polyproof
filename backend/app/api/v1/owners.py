@@ -26,14 +26,21 @@ def _get_serializer() -> URLSafeTimedSerializer:
 def create_owner_session(owner_id: UUID) -> str:
     """Create a signed session token for an owner."""
     serializer = _get_serializer()
-    return serializer.dumps(str(owner_id))
+    return serializer.dumps({"owner_id": str(owner_id)})
 
 
 def verify_owner_session(token: str) -> UUID | None:
     """Verify a session token. Returns owner_id or None."""
     serializer = _get_serializer()
     try:
-        owner_id_str = serializer.loads(token, max_age=_SESSION_MAX_AGE)
+        data = serializer.loads(token, max_age=_SESSION_MAX_AGE)
+        # Support both dict format {"owner_id": "..."} and legacy string format
+        if isinstance(data, dict):
+            owner_id_str = data.get("owner_id")
+        else:
+            owner_id_str = data
+        if not owner_id_str:
+            return None
         return UUID(owner_id_str)
     except (BadSignature, ValueError):
         return None

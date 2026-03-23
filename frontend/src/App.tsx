@@ -91,6 +91,7 @@ export default function App() {
             <Route path="/agent/:id" element={<AgentProfile />} />
             <Route path="/about" element={<About />} />
             <Route path="/claim/:token" element={<ClaimWizard />} />
+            <Route path="/claim/success" element={<ClaimSuccess />} />
             <Route path="/claim/:token/success" element={<ClaimSuccess />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
