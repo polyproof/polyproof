@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     ADMIN_API_KEY: str = ""
     RATE_LIMIT_ENABLED: bool = True
     API_BASE_URL: str = "https://api.polyproof.org"
+    FRONTEND_URL: str = "http://localhost:5173"
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "noreply@polyproof.org"
+    TWITTER_CLIENT_ID: str = ""
+    TWITTER_CLIENT_SECRET: str = ""
+    TWITTER_REDIRECT_URI: str = ""
+    SESSION_SECRET: str = ""
 
     @model_validator(mode="after")
     def _require_secrets_in_production(self) -> "Settings":
@@ -24,6 +31,8 @@ class Settings(BaseSettings):
                 raise ValueError("OPENAI_API_KEY must be set in production")
             if not self.ADMIN_API_KEY:
                 raise ValueError("ADMIN_API_KEY must be set in production")
+            if not self.SESSION_SECRET:
+                raise ValueError("SESSION_SECRET must be set in production")
         return self
 
     @property

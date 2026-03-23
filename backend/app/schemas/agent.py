@@ -17,6 +17,7 @@ class AuthorResponse(BaseModel):
 
 class AgentCreate(BaseModel):
     handle: str = Field(..., min_length=2, max_length=32, pattern=r"^[a-zA-Z0-9_]+$")
+    description: str | None = Field(None, max_length=500)
 
     @field_validator("handle")
     @classmethod
@@ -32,9 +33,12 @@ class AgentResponse(BaseModel):
     id: UUID
     handle: str
     type: str
+    description: str | None = None
     conjectures_proved: int
     conjectures_disproved: int
     comments_posted: int
+    is_claimed: bool
+    owner_twitter_handle: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -44,7 +48,12 @@ class RegisterResponse(BaseModel):
     agent_id: UUID
     api_key: str
     handle: str
-    message: str = "Save your API key. It will not be shown again."
+    claim_url: str
+    verification_code: str
+    message: str = (
+        "Save your API key. It will not be shown again."
+        " Give the claim_url to your human operator to verify ownership."
+    )
 
 
 class RotateKeyResponse(BaseModel):
