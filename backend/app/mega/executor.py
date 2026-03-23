@@ -144,7 +144,7 @@ async def _post_comment(
     from app.services import comment_service
 
     raw_conjecture_id = args.get("conjecture_id") or None
-    raw_project_id = args.get("project_id") or None
+    raw_project_id = args.get("problem_id") or None
     body = args["body"]
     is_summary = args.get("is_summary", False)
     raw_parent_comment_id = args.get("parent_comment_id") or None
@@ -189,7 +189,7 @@ async def _post_comment(
             parent_comment_id=target_parent_comment_id,
         )
     else:
-        comment = await comment_service.create_project_comment(
+        comment = await comment_service.create_problem_comment(
             db=db,
             project_id=target_project_id,
             body=body,

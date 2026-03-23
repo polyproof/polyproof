@@ -11,14 +11,14 @@ class RootConjectureCreate(BaseModel):
     description: str = Field(..., min_length=1, max_length=10_000)
 
 
-class ProjectCreate(BaseModel):
+class ProblemCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str = Field(..., min_length=1, max_length=10_000)
     lean_header: str | None = Field(None, max_length=10_000)
     root_conjecture: RootConjectureCreate
 
 
-class ProjectResponse(BaseModel):
+class ProblemResponse(BaseModel):
     id: UUID
     title: str
     description: str
@@ -35,7 +35,7 @@ class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ProjectDetail(BaseModel):
+class ProblemDetail(BaseModel):
     id: UUID
     title: str
     description: str
@@ -56,12 +56,12 @@ class ProjectDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ProjectListResponse(BaseModel):
-    projects: list[ProjectResponse]
+class ProblemListResponse(BaseModel):
+    problems: list[ProblemResponse]
     total: int
 
 
-class ProjectTreeNode(BaseModel):
+class ProblemTreeNode(BaseModel):
     id: UUID
     lean_statement: str
     description: str
@@ -70,16 +70,16 @@ class ProjectTreeNode(BaseModel):
     proved_by: AuthorResponse | None = None
     disproved_by: AuthorResponse | None = None
     comment_count: int = 0
-    children: list["ProjectTreeNode"] = []
+    children: list["ProblemTreeNode"] = []
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class ProjectTreeResponse(BaseModel):
-    root: ProjectTreeNode | None = None
+class ProblemTreeResponse(BaseModel):
+    root: ProblemTreeNode | None = None
 
 
-class OverviewProject(BaseModel):
+class OverviewProblem(BaseModel):
     id: UUID
     title: str
     description: str
@@ -99,6 +99,6 @@ class OverviewNode(BaseModel):
     summary: str | None = None
 
 
-class ProjectOverview(BaseModel):
-    project: OverviewProject
+class ProblemOverview(BaseModel):
+    problem: OverviewProblem
     tree: list[OverviewNode]

@@ -7,14 +7,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.conjecture import Conjecture
-from app.models.project import Project
+from app.models.problem import Problem
 from app.schemas.proof import DisproofResult, ProofResult
 from app.services import activity_service, assembly_service, lean_client
 
 
 async def _get_lean_header(db: AsyncSession, project_id: UUID) -> str | None:
-    """Look up the project's lean_header."""
-    result = await db.execute(sa_select(Project.lean_header).where(Project.id == project_id))
+    """Look up the problem's lean_header."""
+    result = await db.execute(sa_select(Problem.lean_header).where(Problem.id == project_id))
     row = result.first()
     return row[0] if row else None
 
@@ -159,8 +159,8 @@ async def submit_proof(
             assembly_triggered = True
             parent_proved = await assembly_service.check_and_assemble(conjecture_id, db)
 
-    # Fire project_completed if this is the root conjecture
-    await _check_project_completed(conjecture, db)
+    # Fire problem_completed if this is the root conjecture
+    await _check_problem_completed(conjecture, db)
 
     return ProofResult(
         status="proved",
@@ -170,15 +170,15 @@ async def submit_proof(
     )
 
 
-async def _check_project_completed(conjecture: Conjecture, db: AsyncSession) -> None:
-    """Fire project_completed trigger if the proved conjecture is the project root."""
+async def _check_problem_completed(conjecture: Conjecture, db: AsyncSession) -> None:
+    """Fire problem_completed trigger if the proved conjecture is the problem root."""
     import asyncio
 
-    project = await db.get(Project, conjecture.project_id)
-    if project and project.root_conjecture_id == conjecture.id:
-        from app.mega.scheduler import fire_project_completed
+    problem = await db.get(Problem, conjecture.project_id)
+    if problem and problem.root_conjecture_id == conjecture.id:
+        from app.mega.scheduler import fire_problem_completed
 
-        asyncio.create_task(fire_project_completed(project.id))
+        asyncio.create_task(fire_problem_completed(problem.id))
 
 
 async def submit_disproof(

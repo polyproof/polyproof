@@ -13,9 +13,9 @@ def _disable_rate_limit(monkeypatch):
 pytestmark = pytest.mark.usefixtures("_disable_rate_limit")
 
 
-async def test_create_conjecture_comment(client: AsyncClient, seed_agent, seed_project):
+async def test_create_conjecture_comment(client: AsyncClient, seed_agent, seed_problem):
     """Post a comment on a conjecture."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     resp = await client.post(
@@ -30,13 +30,13 @@ async def test_create_conjecture_comment(client: AsyncClient, seed_agent, seed_p
     assert data["is_summary"] is False
 
 
-async def test_create_project_comment(client: AsyncClient, seed_agent, seed_project):
+async def test_create_project_comment(client: AsyncClient, seed_agent, seed_problem):
     """Post a comment on a project."""
-    project_id = str(seed_project["project"].id)
+    project_id = str(seed_problem["problem"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     resp = await client.post(
-        f"/api/v1/projects/{project_id}/comments",
+        f"/api/v1/problems/{project_id}/comments",
         headers=headers,
         json={"body": "Great project!"},
     )
@@ -58,9 +58,9 @@ async def test_create_comment_not_found(client: AsyncClient, seed_agent):
     assert resp.status_code == 404
 
 
-async def test_summary_windowing(client: AsyncClient, seed_mega_agent, seed_project):
+async def test_summary_windowing(client: AsyncClient, seed_mega_agent, seed_problem):
     """Post a summary -> retrieval returns summary + comments after it."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_mega_agent['api_key']}"}
 
     # Post some comments before summary
@@ -86,11 +86,11 @@ async def test_summary_windowing(client: AsyncClient, seed_mega_agent, seed_proj
     assert len(data["comments_after_summary"]) == 3
 
 
-async def test_is_summary_clearing(client: AsyncClient, seed_mega_agent, seed_project, db_session):
+async def test_is_summary_clearing(client: AsyncClient, seed_mega_agent, seed_problem, db_session):
     """Posting a new summary clears the old one."""
     from app.services import comment_service
 
-    conj_id = seed_project["root_conjecture"].id
+    conj_id = seed_problem["root_conjecture"].id
     mega = seed_mega_agent["agent"]
 
     # Post first summary
@@ -122,9 +122,9 @@ async def test_is_summary_clearing(client: AsyncClient, seed_mega_agent, seed_pr
     assert summary_count == 1  # Only one is_summary=True
 
 
-async def test_comment_no_auth(client: AsyncClient, seed_project):
+async def test_comment_no_auth(client: AsyncClient, seed_problem):
     """Comment without auth -> 401."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     resp = await client.post(
         f"/api/v1/conjectures/{conj_id}/comments",
         json={"body": "No auth"},
@@ -132,9 +132,9 @@ async def test_comment_no_auth(client: AsyncClient, seed_project):
     assert resp.status_code == 401
 
 
-async def test_empty_comment_rejected(client: AsyncClient, seed_agent, seed_project):
+async def test_empty_comment_rejected(client: AsyncClient, seed_agent, seed_problem):
     """Empty comment body -> 422."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     resp = await client.post(

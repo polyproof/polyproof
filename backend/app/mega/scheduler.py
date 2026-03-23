@@ -1,11 +1,11 @@
 """APScheduler-based trigger checking for the mega agent.
 
-Checks triggers every 60 seconds for each active project:
+Checks triggers every 60 seconds for each active problem:
 - activity_threshold: fires when activity count >= ACTIVITY_THRESHOLD
 - periodic_heartbeat: fires when 24+ hours since last invocation
-- project_created: fires once when last_mega_invocation is NULL
+- problem_created: fires once when last_mega_invocation is NULL
 
-Uses per-project asyncio locks to serialize invocations.
+Uses per-problem asyncio locks to serialize invocations.
 """
 
 import asyncio
@@ -21,12 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db.connection import async_session_factory
 from app.models.activity_log import ActivityLog
-from app.models.project import Project
+from app.models.problem import Problem
 
 logger = logging.getLogger(__name__)
 
-# Per-project locks to prevent concurrent mega agent invocations
-_project_locks: dict[UUID, asyncio.Lock] = {}
+# Per-problem locks to prevent concurrent mega agent invocations
+_problem_locks: dict[UUID, asyncio.Lock] = {}
 
 # Default activity threshold (configurable via env var)
 ACTIVITY_THRESHOLD = int(getattr(settings, "ACTIVITY_THRESHOLD", 5))
@@ -40,7 +40,7 @@ scheduler = AsyncIOScheduler()
 def start_scheduler() -> None:
     """Start the APScheduler with the trigger check job."""
     scheduler.add_job(
-        _check_all_projects,
+        _check_all_problems,
         trigger=IntervalTrigger(seconds=60),
         id="mega_agent_trigger_check",
         replace_existing=True,
@@ -56,10 +56,10 @@ def stop_scheduler() -> None:
         logger.info("Mega agent scheduler stopped")
 
 
-async def _check_all_projects() -> None:
-    """Check triggers for all active projects."""
+async def _check_all_problems() -> None:
+    """Check triggers for all active problems."""
     async with async_session_factory() as db:
-        stmt = select(Project.id).where(Project.root_conjecture_id.isnot(None))
+        stmt = select(Problem.id).where(Problem.root_conjecture_id.isnot(None))
         result = await db.execute(stmt)
         project_ids = [row[0] for row in result.all()]
 
@@ -71,25 +71,25 @@ async def _check_all_projects() -> None:
 
 
 async def check_triggers(project_id: UUID) -> None:
-    """Check if any trigger should fire for a project.
+    """Check if any trigger should fire for a problem.
 
     Triggers (in priority order):
-    1. project_created: last_mega_invocation is NULL
+    1. problem_created: last_mega_invocation is NULL
     2. activity_threshold: activity count >= ACTIVITY_THRESHOLD since last invocation
     3. periodic_heartbeat: 24+ hours since last invocation
     """
     async with async_session_factory() as db:
-        project = await db.get(Project, project_id)
-        if not project:
+        problem = await db.get(Problem, project_id)
+        if not problem:
             return
 
-        last_invocation = project.last_mega_invocation
+        last_invocation = problem.last_mega_invocation
 
-        # Trigger 1: project_created (fire once on first invocation)
+        # Trigger 1: problem_created (fire once on first invocation)
         if last_invocation is None:
             await _invoke_mega_agent(
                 project_id,
-                {"trigger": "project_created"},
+                {"trigger": "problem_created"},
                 db,
             )
             return
@@ -139,12 +139,12 @@ async def _invoke_mega_agent(
     trigger: dict,
     db: AsyncSession,
 ) -> None:
-    """Invoke the mega agent for a project, serialized by project lock."""
-    # Get or create a lock for this project
-    if project_id not in _project_locks:
-        _project_locks[project_id] = asyncio.Lock()
+    """Invoke the mega agent for a problem, serialized by problem lock."""
+    # Get or create a lock for this problem
+    if project_id not in _problem_locks:
+        _problem_locks[project_id] = asyncio.Lock()
 
-    lock = _project_locks[project_id]
+    lock = _problem_locks[project_id]
 
     # Don't block if another invocation is running -- just skip
     if lock.locked():
@@ -169,8 +169,8 @@ async def _invoke_mega_agent(
             # Only update timestamp on successful run (not on API failure)
             if result.get("status") == "ok":
                 await db.execute(
-                    update(Project)
-                    .where(Project.id == project_id)
+                    update(Problem)
+                    .where(Problem.id == project_id)
                     .values(last_mega_invocation=func.now())
                 )
                 await db.commit()
@@ -184,8 +184,8 @@ async def _invoke_mega_agent(
             logger.exception("Mega agent invocation failed for project %s", project_id)
 
 
-async def fire_project_completed(project_id: UUID) -> None:
-    """Fire a project_completed trigger after the caller's transaction commits.
+async def fire_problem_completed(project_id: UUID) -> None:
+    """Fire a problem_completed trigger after the caller's transaction commits.
 
     Called via asyncio.create_task when the root conjecture is proved (via
     direct proof or assembly). Waits briefly for the caller's transaction to
@@ -196,20 +196,20 @@ async def fire_project_completed(project_id: UUID) -> None:
 
     async with async_session_factory() as db:
         # Verify the root is actually proved (guards against rollbacks)
-        project = await db.get(Project, project_id)
-        if not project or not project.root_conjecture_id:
+        problem = await db.get(Problem, project_id)
+        if not problem or not problem.root_conjecture_id:
             return
         from app.models.conjecture import Conjecture
 
-        root = await db.get(Conjecture, project.root_conjecture_id)
+        root = await db.get(Conjecture, problem.root_conjecture_id)
         if not root or root.status != "proved":
-            logger.info("Root not proved for project %s, skipping project_completed", project_id)
+            logger.info("Root not proved for problem %s, skipping problem_completed", project_id)
             return
 
-        logger.info("Firing project_completed trigger for project %s", project_id)
+        logger.info("Firing problem_completed trigger for problem %s", project_id)
         await _invoke_mega_agent(
             project_id,
-            {"trigger": "project_completed"},
+            {"trigger": "problem_completed"},
             db,
         )
 

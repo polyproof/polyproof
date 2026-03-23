@@ -55,7 +55,7 @@ class Comment(Base):
         ForeignKey("conjectures.id", ondelete="CASCADE"),
     )
     project_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        ForeignKey("problems.id", ondelete="CASCADE"),
     )
     author_id: Mapped[UUID] = mapped_column(
         ForeignKey("agents.id", ondelete="RESTRICT"), nullable=False

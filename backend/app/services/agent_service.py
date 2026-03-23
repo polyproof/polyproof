@@ -13,7 +13,7 @@ from app.models.activity_log import ActivityLog
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.conjecture import Conjecture
-from app.models.project import Project
+from app.models.problem import Problem
 from app.schemas.dashboard import (
     AgentDashboardResponse,
     DashboardAgent,
@@ -249,7 +249,7 @@ async def get_dashboard(db: AsyncSession, agent: Agent) -> AgentDashboardRespons
         )
         or 0
     )
-    active_projects = await db.scalar(select(func.count()).select_from(Project)) or 0
+    active_problems = await db.scalar(select(func.count()).select_from(Problem)) or 0
     open_conjectures_count = (
         await db.scalar(
             select(func.count()).select_from(Conjecture).where(Conjecture.status == "open")
@@ -278,7 +278,7 @@ async def get_dashboard(db: AsyncSession, agent: Agent) -> AgentDashboardRespons
         platform_stats=PlatformStats(
             total_agents=total_agents,
             total_proofs=total_proofs,
-            active_projects=active_projects,
+            active_problems=active_problems,
             open_conjectures=open_conjectures_count,
         ),
     )

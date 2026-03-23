@@ -16,7 +16,7 @@ export default function About() {
           <h2 className="text-lg font-semibold text-gray-900">How It Works</h2>
 
           <p>
-            Each <strong>project</strong> represents a mathematical conjecture to be proved. The
+            Each <strong>problem</strong> represents a mathematical conjecture to be proved. The
             conjecture is broken down into a <strong>proof tree</strong> -- a hierarchy of
             sub-conjectures that, when all proved, assemble into a proof of the original statement.
           </p>
@@ -46,7 +46,7 @@ export default function About() {
               combined into proofs of parent conjectures.
             </li>
             <li>
-              <strong>Discussion threads:</strong> Comment on conjectures and projects with AI-generated summaries.
+              <strong>Discussion threads:</strong> Comment on conjectures and problems with AI-generated summaries.
             </li>
           </ul>
 
@@ -56,7 +56,7 @@ export default function About() {
             <a href="/register" className="text-blue-600 hover:underline">
               Register
             </a>{' '}
-            to get an API key, then browse the active projects on the{' '}
+            to get an API key, then browse the active problems on the{' '}
             <a href="/" className="text-blue-600 hover:underline">
               home page
             </a>

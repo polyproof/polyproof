@@ -16,7 +16,7 @@ from app.models.activity_log import ActivityLog
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.conjecture import Conjecture
-from app.models.project import Project
+from app.models.problem import Problem
 
 logger = logging.getLogger(__name__)
 
@@ -37,22 +37,22 @@ async def build_context_packet(
     - CONJECTURE SUMMARIES: per-conjecture summaries for active nodes
     - STUCK NODES: open conjectures with no activity in 48+ hours
     """
-    project = await db.get(Project, project_id)
-    if not project:
-        raise ValueError(f"Project {project_id} not found")
+    problem = await db.get(Problem, project_id)
+    if not problem:
+        raise ValueError(f"Problem {project_id} not found")
 
-    root = await db.get(Conjecture, project.root_conjecture_id)
+    root = await db.get(Conjecture, problem.root_conjecture_id)
     if not root:
-        raise ValueError(f"Root conjecture not found for project {project_id}")
+        raise ValueError(f"Root conjecture not found for problem {project_id}")
 
     sections = []
 
-    # --- PROJECT section ---
+    # --- PROBLEM section ---
     progress = await _compute_progress(project_id, db)
     sections.append(
-        f"PROJECT\n\n"
-        f"Title: {project.title}\n"
-        f"Description: {project.description}\n"
+        f"PROBLEM\n\n"
+        f"Title: {problem.title}\n"
+        f"Description: {problem.description}\n"
         f"Root: {root.lean_statement}\n"
         f"Root status: {root.status}\n"
         f"Progress: {progress['proved']}/{progress['total']} leaves proved "
@@ -65,17 +65,17 @@ async def build_context_packet(
     sections.append(f"TRIGGER\n\n{trigger_type}: {trigger_details}")
 
     # --- PROOF TREE section ---
-    tree_text = await _build_proof_tree(project_id, project.root_conjecture_id, db)
+    tree_text = await _build_proof_tree(project_id, problem.root_conjecture_id, db)
     sections.append(f"PROOF TREE\n\n{tree_text}")
 
     # --- RECENT ACTIVITY section ---
-    last_invocation = project.last_mega_invocation
+    last_invocation = problem.last_mega_invocation
     activity_text = await _build_recent_activity(project_id, last_invocation, db)
     sections.append(f"RECENT ACTIVITY (since start of your last invocation)\n\n{activity_text}")
 
-    # --- PROJECT SUMMARY section ---
-    project_summary = await _get_project_summary(project_id, db)
-    sections.append(f"PROJECT SUMMARY\n\n{project_summary}")
+    # --- PROBLEM SUMMARY section ---
+    problem_summary = await _get_problem_summary(project_id, db)
+    sections.append(f"PROBLEM SUMMARY\n\n{problem_summary}")
 
     # --- CONJECTURE SUMMARIES section ---
     conj_summaries = await _build_conjecture_summaries(project_id, last_invocation, db)
@@ -122,16 +122,16 @@ async def _compute_progress(project_id: UUID, db: AsyncSession) -> dict:
 
 def _format_trigger(trigger_type: str, trigger: dict) -> str:
     """Format trigger details for the context packet."""
-    if trigger_type == "project_created":
-        return "New project. Study the root and bootstrap."
+    if trigger_type == "problem_created":
+        return "New problem. Study the root and bootstrap."
     elif trigger_type == "activity_threshold":
         count = trigger.get("activity_count", "N")
         return f"{count} interactions since your last invocation."
     elif trigger_type == "periodic_heartbeat":
         return "24 hours since last invocation. No activity threshold fired."
-    elif trigger_type == "project_completed":
+    elif trigger_type == "problem_completed":
         return (
-            "The root conjecture has been PROVED. The project is complete. "
+            "The root conjecture has been PROVED. The problem is complete. "
             "Write a final retrospective summary."
         )
     return f"Unknown trigger: {trigger_type}"
@@ -289,7 +289,7 @@ async def _build_recent_activity(
         handle = row.agent_handle or "system"
         details = event.details or {}
         time_str = event.created_at.strftime("%Y-%m-%d %H:%M UTC")
-        conj_id = str(event.conjecture_id) if event.conjecture_id else "project"
+        conj_id = str(event.conjecture_id) if event.conjecture_id else "problem"
 
         if event.event_type == "comment":
             body_preview = details.get("body_preview", "")[:500]
@@ -334,8 +334,8 @@ async def _build_recent_activity(
     return "\n\n".join(parts) if parts else "(no activity since last invocation)"
 
 
-async def _get_project_summary(project_id: UUID, db: AsyncSession) -> str:
-    """Get the latest is_summary comment on the project."""
+async def _get_problem_summary(project_id: UUID, db: AsyncSession) -> str:
+    """Get the latest is_summary comment on the problem."""
     stmt = (
         select(Comment.body)
         .where(

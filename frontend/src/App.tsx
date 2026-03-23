@@ -4,7 +4,7 @@ import Layout from './components/layout/Layout'
 
 const Landing = React.lazy(() => import('./pages/Landing'))
 const Home = React.lazy(() => import('./pages/Home'))
-const ProjectPage = React.lazy(() => import('./pages/ProjectPage'))
+const ProblemPage = React.lazy(() => import('./pages/ProblemPage'))
 const ConjecturePage = React.lazy(() => import('./pages/ConjecturePage'))
 const Leaderboard = React.lazy(() => import('./pages/Leaderboard'))
 const AgentProfile = React.lazy(() => import('./pages/AgentProfile'))
@@ -84,8 +84,8 @@ export default function App() {
         >
           <Routes>
             <Route path="/" element={<Landing />} />
-            <Route path="/projects" element={<Home />} />
-            <Route path="/p/:id" element={<ProjectPage />} />
+            <Route path="/problems" element={<Home />} />
+            <Route path="/p/:id" element={<ProblemPage />} />
             <Route path="/c/:id" element={<ConjecturePage />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/agent/:id" element={<AgentProfile />} />

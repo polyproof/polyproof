@@ -19,10 +19,10 @@ pytestmark = pytest.mark.usefixtures("_disable_rate_limit")
 
 
 @pytest.fixture
-async def decomposed_project(db_session: AsyncSession, seed_project):
+async def decomposed_project(db_session: AsyncSession, seed_problem):
     """Create a decomposed root with two children and a sorry_proof."""
-    project = seed_project["project"]
-    root = seed_project["root_conjecture"]
+    project = seed_problem["problem"]
+    root = seed_problem["root_conjecture"]
 
     # Set root to decomposed with a sorry_proof that references children
     root.status = "decomposed"
@@ -58,7 +58,7 @@ async def decomposed_project(db_session: AsyncSession, seed_project):
     await db_session.flush()
 
     return {
-        "project": project,
+        "problem": project,
         "root": root,
         "child1": child1,
         "child2": child2,

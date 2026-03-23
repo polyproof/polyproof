@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { useConjecture, useProject } from '../hooks'
+import { useConjecture, useProblem } from '../hooks'
 import Layout from '../components/layout/Layout'
 import BreadcrumbNav from '../components/ui/BreadcrumbNav'
 import MarkdownContent from '../components/ui/MarkdownContent'
@@ -45,8 +45,8 @@ export default function ConjecturePage() {
   const { id } = useParams<{ id: string }>()
   const { data: conjecture, error, isLoading, mutate } = useConjecture(id!)
 
-  // Fetch project title for breadcrumb
-  const { data: project } = useProject(conjecture?.project_id ?? '')
+  // Fetch problem title for breadcrumb
+  const { data: problem } = useProblem(conjecture?.project_id ?? '')
 
   // Build UUID → description map for resolving conjecture references
   const refs: ReferenceMap = useMemo(() => {
@@ -94,8 +94,8 @@ export default function ConjecturePage() {
       <div className="mb-4">
         <BreadcrumbNav
           parent_chain={conjecture.parent_chain}
-          projectId={conjecture.project_id}
-          projectTitle={project?.title ?? 'Project'}
+          problemId={conjecture.project_id}
+          problemTitle={problem?.title ?? 'Problem'}
         />
       </div>
 

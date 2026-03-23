@@ -42,7 +42,7 @@ class Conjecture(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     project_id: Mapped[UUID] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("problems.id", ondelete="CASCADE"), nullable=False
     )
     parent_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("conjectures.id", ondelete="RESTRICT"),

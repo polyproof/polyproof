@@ -13,9 +13,9 @@ def _disable_rate_limit(monkeypatch):
 pytestmark = pytest.mark.usefixtures("_disable_rate_limit")
 
 
-async def test_submit_proof_pass(client: AsyncClient, seed_agent, seed_project, mock_lean_pass):
+async def test_submit_proof_pass(client: AsyncClient, seed_agent, seed_problem, mock_lean_pass):
     """Submit a valid proof -> conjecture becomes proved."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     resp = await client.post(
@@ -30,10 +30,10 @@ async def test_submit_proof_pass(client: AsyncClient, seed_agent, seed_project, 
 
 
 async def test_submit_proof_on_closed_conjecture(
-    client: AsyncClient, seed_agent, seed_project, mock_lean_pass
+    client: AsyncClient, seed_agent, seed_problem, mock_lean_pass
 ):
     """Submit proof on already-proved conjecture -> 409."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     # First proof succeeds
@@ -54,10 +54,10 @@ async def test_submit_proof_on_closed_conjecture(
 
 
 async def test_submit_proof_lean_failure(
-    client: AsyncClient, seed_agent, seed_project, mock_lean_fail
+    client: AsyncClient, seed_agent, seed_problem, mock_lean_fail
 ):
     """Submit proof that Lean rejects -> 200 with rejected status."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     resp = await client.post(
@@ -84,9 +84,9 @@ async def test_submit_proof_not_found(client: AsyncClient, seed_agent, mock_lean
     assert resp.status_code == 404
 
 
-async def test_submit_proof_no_auth(client: AsyncClient, seed_project, mock_lean_pass):
+async def test_submit_proof_no_auth(client: AsyncClient, seed_problem, mock_lean_pass):
     """Submit proof without auth -> 401."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     resp = await client.post(
         f"/api/v1/conjectures/{conj_id}/proofs",
         json={"lean_code": "simp"},

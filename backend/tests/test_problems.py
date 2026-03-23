@@ -1,4 +1,4 @@
-"""Tests for project creation, listing, and detail endpoints."""
+"""Tests for problem creation, listing, and detail endpoints."""
 
 import pytest
 from httpx import AsyncClient
@@ -21,9 +21,9 @@ def admin_headers(monkeypatch):
 pytestmark = pytest.mark.usefixtures("_disable_rate_limit")
 
 
-async def test_create_project_admin(client: AsyncClient, admin_headers, mock_lean_pass):
+async def test_create_problem_admin(client: AsyncClient, admin_headers, mock_lean_pass):
     resp = await client.post(
-        "/api/v1/projects",
+        "/api/v1/problems",
         headers=admin_headers,
         json={
             "title": "Fermat's Last Theorem",
@@ -42,14 +42,14 @@ async def test_create_project_admin(client: AsyncClient, admin_headers, mock_lea
     assert data["root_status"] == "open"
 
 
-async def test_create_project_non_admin(client: AsyncClient, seed_agent, mock_lean_pass):
+async def test_create_problem_non_admin(client: AsyncClient, seed_agent, mock_lean_pass):
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
     resp = await client.post(
-        "/api/v1/projects",
+        "/api/v1/problems",
         headers=headers,
         json={
             "title": "Not Allowed",
-            "description": "Unauthorized project",
+            "description": "Unauthorized problem",
             "root_conjecture": {
                 "lean_statement": "True",
                 "description": "Root",
@@ -59,9 +59,9 @@ async def test_create_project_non_admin(client: AsyncClient, seed_agent, mock_le
     assert resp.status_code == 401
 
 
-async def test_create_project_no_auth(client: AsyncClient, mock_lean_pass):
+async def test_create_problem_no_auth(client: AsyncClient, mock_lean_pass):
     resp = await client.post(
-        "/api/v1/projects",
+        "/api/v1/problems",
         json={
             "title": "No Auth",
             "description": "No auth",
@@ -74,23 +74,23 @@ async def test_create_project_no_auth(client: AsyncClient, mock_lean_pass):
     assert resp.status_code == 401
 
 
-async def test_list_projects_with_progress(client: AsyncClient, seed_project):
-    resp = await client.get("/api/v1/projects")
+async def test_list_problems_with_progress(client: AsyncClient, seed_problem):
+    resp = await client.get("/api/v1/problems")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] >= 1
-    project = data["projects"][0]
-    assert "progress" in project
-    assert "root_status" in project
-    assert "root_conjecture_id" in project
+    problem = data["problems"][0]
+    assert "progress" in problem
+    assert "root_status" in problem
+    assert "root_conjecture_id" in problem
 
 
-async def test_get_project_detail(client: AsyncClient, seed_project):
-    project_id = str(seed_project["project"].id)
-    resp = await client.get(f"/api/v1/projects/{project_id}")
+async def test_get_problem_detail(client: AsyncClient, seed_problem):
+    problem_id = str(seed_problem["problem"].id)
+    resp = await client.get(f"/api/v1/problems/{problem_id}")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["title"] == "Test Project"
+    assert data["title"] == "Test Problem"
     assert "total_conjectures" in data
     assert "open_conjectures" in data
     assert "proved_conjectures" in data
@@ -99,7 +99,7 @@ async def test_get_project_detail(client: AsyncClient, seed_project):
     assert "progress" in data
 
 
-async def test_get_project_not_found(client: AsyncClient):
+async def test_get_problem_not_found(client: AsyncClient):
     fake_id = "00000000-0000-0000-0000-000000000000"
-    resp = await client.get(f"/api/v1/projects/{fake_id}")
+    resp = await client.get(f"/api/v1/problems/{fake_id}")
     assert resp.status_code == 404

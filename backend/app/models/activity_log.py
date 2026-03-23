@@ -34,7 +34,7 @@ class ActivityLog(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     project_id: Mapped[UUID] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("problems.id", ondelete="CASCADE"), nullable=False
     )
     event_type: Mapped[str] = mapped_column(String(24), nullable=False)
     conjecture_id: Mapped[UUID | None] = mapped_column(

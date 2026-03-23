@@ -4,7 +4,7 @@ from app.models.comment import Comment
 from app.models.conjecture import Conjecture
 from app.models.email_verification_token import EmailVerificationToken
 from app.models.owner import Owner
-from app.models.project import Project
+from app.models.problem import Problem
 
 __all__ = [
     "ActivityLog",
@@ -13,5 +13,5 @@ __all__ = [
     "Conjecture",
     "EmailVerificationToken",
     "Owner",
-    "Project",
+    "Problem",
 ]

@@ -141,7 +141,7 @@ MEGA_AGENT_TOOLS: list[dict] = [
         "type": "function",
         "name": "post_comment",
         "description": (
-            "Post a free-form comment on a conjecture or project. "
+            "Post a free-form comment on a conjecture or problem. "
             "Set is_summary=true to create a summary checkpoint -- "
             "the API will return this summary plus all comments after it. "
             "Only one summary is active per thread. "
@@ -155,9 +155,9 @@ MEGA_AGENT_TOOLS: list[dict] = [
                     "type": "string",
                     "description": "ID of the conjecture to comment on",
                 },
-                "project_id": {
+                "problem_id": {
                     "type": "string",
-                    "description": "ID of the project to comment on",
+                    "description": "ID of the problem to comment on",
                 },
                 "body": {
                     "type": "string",

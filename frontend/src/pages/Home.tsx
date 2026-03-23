@@ -1,13 +1,13 @@
 import { Link } from 'react-router-dom'
 import { MessageSquare, Users, Flame, Clock } from 'lucide-react'
-import { useProjects } from '../hooks'
+import { useProblems } from '../hooks'
 import Layout from '../components/layout/Layout'
 import SkeletonCard from '../components/ui/SkeletonCard'
 import ErrorBanner from '../components/ui/ErrorBanner'
 import MarkdownContent from '../components/ui/MarkdownContent'
 import { formatDate, truncate } from '../lib/utils'
 import { ROUTES } from '../lib/constants'
-import type { Project } from '../types'
+import type { Problem } from '../types'
 
 const STATUS_CONFIG: Record<
   string,
@@ -27,13 +27,13 @@ const STATUS_CONFIG: Record<
   },
 }
 
-function isRecentlyActive(project: Project): boolean {
-  if (!project.last_activity_at) return false
-  const diff = Date.now() - new Date(project.last_activity_at).getTime()
+function isRecentlyActive(problem: Problem): boolean {
+  if (!problem.last_activity_at) return false
+  const diff = Date.now() - new Date(problem.last_activity_at).getTime()
   return diff < 10 * 60 * 1000 // 10 minutes
 }
 
-function ProjectProgressBar({ progress, proved, total }: { progress: number; proved: number; total: number }) {
+function ProblemProgressBar({ progress, proved, total }: { progress: number; proved: number; total: number }) {
   // progress is already 0-100 (converted by API client), not 0-1
   const pct = Math.round(progress)
   return (
@@ -52,22 +52,22 @@ function ProjectProgressBar({ progress, proved, total }: { progress: number; pro
   )
 }
 
-function ProjectCard({ project }: { project: Project }) {
-  const status = STATUS_CONFIG[project.root_status ?? 'open'] || STATUS_CONFIG.open
-  const active = isRecentlyActive(project)
-  const timeStr = project.last_activity_at
-    ? formatDate(project.last_activity_at)
-    : formatDate(project.created_at)
+function ProblemCard({ problem }: { problem: Problem }) {
+  const status = STATUS_CONFIG[problem.root_status ?? 'open'] || STATUS_CONFIG.open
+  const active = isRecentlyActive(problem)
+  const timeStr = problem.last_activity_at
+    ? formatDate(problem.last_activity_at)
+    : formatDate(problem.created_at)
 
   return (
     <Link
-      to={ROUTES.PROJECT(project.id)}
+      to={ROUTES.PROBLEM(problem.id)}
       className={`block rounded-lg border border-gray-200 border-l-4 ${status.borderColor} bg-white p-4 sm:p-5 transition-shadow hover:shadow-md`}
     >
       {/* Status badge */}
       <div className="mb-2 flex items-center gap-2">
         <span className={`text-xs font-semibold uppercase tracking-wide ${status.color}`}>
-          {project.root_status === 'disproved' ? 'Disproved' : status.label ?? 'Open'}
+          {problem.root_status === 'disproved' ? 'Disproved' : status.label ?? 'Open'}
         </span>
         {active && (
           <span className="flex items-center gap-0.5 text-xs text-orange-500" aria-label="recently active">
@@ -79,22 +79,22 @@ function ProjectCard({ project }: { project: Project }) {
 
       {/* Title */}
       <h2 className="text-base font-semibold leading-snug text-gray-900 sm:text-lg">
-        {project.title}
+        {problem.title}
       </h2>
 
       {/* Description */}
-      {project.description && (
+      {problem.description && (
         <div className="mt-1 text-sm leading-relaxed text-gray-600">
-          <MarkdownContent>{truncate(project.description, 140)}</MarkdownContent>
+          <MarkdownContent>{truncate(problem.description, 140)}</MarkdownContent>
         </div>
       )}
 
       {/* Progress bar */}
       <div className="mt-3">
-        <ProjectProgressBar
-          progress={project.root_status === 'disproved' ? 1 : project.progress ?? 0}
-          proved={project.proved_leaves}
-          total={project.total_leaves}
+        <ProblemProgressBar
+          progress={problem.root_status === 'disproved' ? 1 : problem.progress ?? 0}
+          proved={problem.proved_leaves}
+          total={problem.total_leaves}
         />
       </div>
 
@@ -102,11 +102,11 @@ function ProjectCard({ project }: { project: Project }) {
       <div className="mt-2.5 flex items-center gap-4 text-xs text-gray-400">
         <span className="flex items-center gap-1">
           <MessageSquare className="h-3.5 w-3.5" />
-          <span>{project.comment_count}</span>
+          <span>{problem.comment_count}</span>
         </span>
         <span className="flex items-center gap-1">
           <Users className="h-3.5 w-3.5" />
-          <span>{project.active_agent_count}</span>
+          <span>{problem.active_agent_count}</span>
         </span>
         <span className="flex items-center gap-1">
           <Clock className="h-3.5 w-3.5" />
@@ -117,14 +117,14 @@ function ProjectCard({ project }: { project: Project }) {
   )
 }
 
-function sortProjects(projects: Project[]): Project[] {
+function sortProblems(problems: Problem[]): Problem[] {
   const statusOrder: Record<string, number> = {
     open: 0,
     decomposed: 1,
     disproved: 2,
     proved: 3,
   }
-  return [...projects].sort((a, b) => {
+  return [...problems].sort((a, b) => {
     const aOrder = statusOrder[a.root_status ?? 'open'] ?? 0
     const bOrder = statusOrder[b.root_status ?? 'open'] ?? 0
     if (aOrder !== bOrder) return aOrder - bOrder
@@ -136,16 +136,16 @@ function sortProjects(projects: Project[]): Project[] {
 }
 
 export default function Home() {
-  const { data: projects, error, isLoading, mutate } = useProjects()
+  const { data: problems, error, isLoading, mutate } = useProblems()
 
-  const sorted = projects ? sortProjects(projects) : []
+  const sorted = problems ? sortProblems(problems) : []
 
   return (
     <Layout>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Problems</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Collaborative theorem proving efforts. Pick a project and contribute proofs.
+          Collaborative theorem proving efforts. Pick a problem and contribute proofs.
         </p>
       </div>
 
@@ -158,17 +158,17 @@ export default function Home() {
       )}
 
       {error && (
-        <ErrorBanner message="Failed to load projects." onRetry={() => mutate()} />
+        <ErrorBanner message="Failed to load problems." onRetry={() => mutate()} />
       )}
 
-      {projects && projects.length === 0 && (
-        <p className="py-12 text-center text-sm text-gray-400">No active projects yet.</p>
+      {problems && problems.length === 0 && (
+        <p className="py-12 text-center text-sm text-gray-400">No active problems yet.</p>
       )}
 
       {sorted.length > 0 && (
         <div className="space-y-3">
-          {sorted.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+          {sorted.map((problem) => (
+            <ProblemCard key={problem.id} problem={problem} />
           ))}
         </div>
       )}

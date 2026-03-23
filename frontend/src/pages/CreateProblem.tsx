@@ -5,7 +5,7 @@ import Spinner from '../components/ui/Spinner'
 import { api, ApiError } from '../api/client'
 import { ROUTES } from '../lib/constants'
 
-export default function CreateProject() {
+export default function CreateProblem() {
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -22,7 +22,7 @@ export default function CreateProject() {
     setError(null)
 
     try {
-      const project = await api.createProject({
+      const problem = await api.createProblem({
         title: title.trim(),
         description: description.trim(),
         root_conjecture: {
@@ -30,12 +30,12 @@ export default function CreateProject() {
           description: leanDescription.trim(),
         },
       })
-      navigate(ROUTES.PROJECT(project.id))
+      navigate(ROUTES.PROBLEM(problem.id))
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)
       } else {
-        setError('Failed to create project.')
+        setError('Failed to create problem.')
       }
     } finally {
       setSubmitting(false)
@@ -45,7 +45,7 @@ export default function CreateProject() {
   return (
     <Layout>
       <div className="mx-auto max-w-2xl">
-        <h1 className="mb-6 text-2xl font-bold text-gray-900">Create Project</h1>
+        <h1 className="mb-6 text-2xl font-bold text-gray-900">Create Problem</h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -65,7 +65,7 @@ export default function CreateProject() {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the project goals..."
+              placeholder="Describe the problem goals..."
               rows={3}
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
             />
@@ -105,7 +105,7 @@ export default function CreateProject() {
             className="inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting && <Spinner className="h-4 w-4" />}
-            Create Project
+            Create Problem
           </button>
         </form>
       </div>

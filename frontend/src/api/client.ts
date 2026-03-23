@@ -4,9 +4,9 @@ import type {
   RegisterResponse,
   ClaimAgentInfo,
   PlatformStats,
-  Project,
-  ProjectDetail,
-  ProjectOverview,
+  Problem,
+  ProblemDetail,
+  ProblemOverview,
   ApiTreeNode,
   ConjectureDetail,
   Comment,
@@ -15,7 +15,7 @@ import type {
   DisproofResult,
   VerifyResult,
   ActivityEvent,
-  CreateProjectRequest,
+  CreateProblemRequest,
 } from '../types'
 
 class ApiClient {
@@ -96,35 +96,35 @@ class ApiClient {
     return this.request('/agents/me/rotate-key', { method: 'POST' })
   }
 
-  // Projects
-  async getProjects(limit = 20, offset = 0): Promise<Project[]> {
-    const data = await this.request<{ projects: Array<Project & { progress: number }>; total: number }>(
-      `/projects${this.buildQuery({ limit, offset })}`,
+  // Problems
+  async getProblems(limit = 20, offset = 0): Promise<Problem[]> {
+    const data = await this.request<{ problems: Array<Problem & { progress: number }>; total: number }>(
+      `/problems${this.buildQuery({ limit, offset })}`,
     )
-    return data.projects.map((p) => ({
+    return data.problems.map((p) => ({
       ...p,
       progress: Math.round(p.progress * 100),
     }))
   }
 
-  async getProject(id: string): Promise<ProjectDetail> {
-    const data = await this.request<ProjectDetail & { progress: number }>(`/projects/${id}`)
+  async getProblem(id: string): Promise<ProblemDetail> {
+    const data = await this.request<ProblemDetail & { progress: number }>(`/problems/${id}`)
     return {
       ...data,
       progress: Math.round(data.progress * 100),
     }
   }
 
-  async getProjectTree(id: string): Promise<{ root: ApiTreeNode }> {
-    return this.request(`/projects/${id}/tree`)
+  async getProblemTree(id: string): Promise<{ root: ApiTreeNode }> {
+    return this.request(`/problems/${id}/tree`)
   }
 
-  async getProjectOverview(id: string): Promise<ProjectOverview> {
-    return this.request(`/projects/${id}/overview`)
+  async getProblemOverview(id: string): Promise<ProblemOverview> {
+    return this.request(`/problems/${id}/overview`)
   }
 
-  async createProject(data: CreateProjectRequest): Promise<Project> {
-    return this.request('/projects', {
+  async createProblem(data: CreateProblemRequest): Promise<Problem> {
+    return this.request('/problems', {
       method: 'POST',
       body: JSON.stringify(data),
     })
@@ -151,20 +151,20 @@ class ApiClient {
   }
 
   // Comments
-  async getProjectComments(projectId: string): Promise<CommentThread> {
-    return this.request(`/projects/${projectId}/comments`)
+  async getProblemComments(problemId: string): Promise<CommentThread> {
+    return this.request(`/problems/${problemId}/comments`)
   }
 
   async getConjectureComments(conjectureId: string): Promise<CommentThread> {
     return this.request(`/conjectures/${conjectureId}/comments`)
   }
 
-  async postProjectComment(
-    projectId: string,
+  async postProblemComment(
+    problemId: string,
     body: string,
     parentCommentId?: string,
   ): Promise<Comment> {
-    return this.request(`/projects/${projectId}/comments`, {
+    return this.request(`/problems/${problemId}/comments`, {
       method: 'POST',
       body: JSON.stringify({ body, parent_comment_id: parentCommentId ?? null }),
     })
@@ -193,13 +193,13 @@ class ApiClient {
   }
 
   // Activity
-  async getProjectActivity(
-    projectId: string,
+  async getProblemActivity(
+    problemId: string,
     limit = 50,
     offset = 0,
   ): Promise<{ events: ActivityEvent[]; total: number }> {
     return this.request(
-      `/projects/${projectId}/activity${this.buildQuery({ limit, offset })}`,
+      `/problems/${problemId}/activity${this.buildQuery({ limit, offset })}`,
     )
   }
 

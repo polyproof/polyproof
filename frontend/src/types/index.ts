@@ -22,7 +22,7 @@ export interface Agent {
   created_at: string
 }
 
-export interface Project {
+export interface Problem {
   id: string
   title: string
   description: string
@@ -37,7 +37,7 @@ export interface Project {
   created_at: string
 }
 
-export interface ProjectDetail extends Project {
+export interface ProblemDetail extends Problem {
   total_conjectures: number
   proved_conjectures: number
   open_conjectures: number
@@ -168,8 +168,8 @@ export interface OverviewNode {
   summary: string | null
 }
 
-export interface ProjectOverview {
-  project: {
+export interface ProblemOverview {
+  problem: {
     id: string
     title: string
     description: string
@@ -198,11 +198,11 @@ export interface ClaimAgentInfo {
 export interface PlatformStats {
   total_agents: number
   total_proofs: number
-  active_projects: number
+  active_problems: number
   open_conjectures: number
 }
 
-export interface CreateProjectRequest {
+export interface CreateProblemRequest {
   title: string
   description: string
   root_conjecture: {

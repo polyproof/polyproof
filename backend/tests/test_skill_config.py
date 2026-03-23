@@ -61,9 +61,9 @@ async def test_cors_headers(client: AsyncClient):
     assert resp.status_code in (200, 204)
 
 
-async def test_lean_code_max_length(client: AsyncClient, seed_agent, seed_project, mock_lean_pass):
+async def test_lean_code_max_length(client: AsyncClient, seed_agent, seed_problem, mock_lean_pass):
     """lean_code over 100k chars should be rejected by schema validation."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     # 100_001 chars should fail
@@ -76,9 +76,9 @@ async def test_lean_code_max_length(client: AsyncClient, seed_agent, seed_projec
     assert resp.status_code == 422
 
 
-async def test_comment_body_max_length(client: AsyncClient, seed_agent, seed_project):
+async def test_comment_body_max_length(client: AsyncClient, seed_agent, seed_problem):
     """Comment body over 10k chars should be rejected."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     long_body = "x" * 10_001
@@ -99,7 +99,7 @@ async def test_project_description_max_length(client: AsyncClient, monkeypatch, 
 
     long_desc = "d" * 10_001
     resp = await client.post(
-        "/api/v1/projects",
+        "/api/v1/problems",
         headers=headers,
         json={
             "title": "Test",

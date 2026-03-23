@@ -18,9 +18,9 @@ def _disable_rate_limit(monkeypatch):
 pytestmark = pytest.mark.usefixtures("_disable_rate_limit")
 
 
-async def test_submit_disproof_pass(client: AsyncClient, seed_agent, seed_project, mock_lean_pass):
+async def test_submit_disproof_pass(client: AsyncClient, seed_agent, seed_problem, mock_lean_pass):
     """Submit a valid disproof -> conjecture becomes disproved."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     resp = await client.post(
@@ -35,10 +35,10 @@ async def test_submit_disproof_pass(client: AsyncClient, seed_agent, seed_projec
 
 
 async def test_disproof_on_closed_conjecture(
-    client: AsyncClient, seed_agent, seed_project, mock_lean_pass
+    client: AsyncClient, seed_agent, seed_problem, mock_lean_pass
 ):
     """Submit disproof on already-proved conjecture -> 409."""
-    conj_id = str(seed_project["root_conjecture"].id)
+    conj_id = str(seed_problem["root_conjecture"].id)
     headers = {"Authorization": f"Bearer {seed_agent['api_key']}"}
 
     # First: prove it
@@ -58,11 +58,11 @@ async def test_disproof_on_closed_conjecture(
 
 
 async def test_descendant_invalidation(
-    client: AsyncClient, seed_agent, db_session: AsyncSession, seed_project, mock_lean_pass
+    client: AsyncClient, seed_agent, db_session: AsyncSession, seed_problem, mock_lean_pass
 ):
     """Disprove a decomposed parent -> children become invalid."""
-    project = seed_project["project"]
-    root = seed_project["root_conjecture"]
+    project = seed_problem["problem"]
+    root = seed_problem["root_conjecture"]
 
     # Create children manually (simulating decomposition)
     child1 = Conjecture(

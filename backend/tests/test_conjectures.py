@@ -19,10 +19,10 @@ pytestmark = pytest.mark.usefixtures("_disable_rate_limit")
 
 
 @pytest.fixture
-async def seed_tree(db_session: AsyncSession, seed_project):
+async def seed_tree(db_session: AsyncSession, seed_problem):
     """Create a tree: root -> child1, child2 (child1 proved, child2 open)."""
-    project = seed_project["project"]
-    root = seed_project["root_conjecture"]
+    project = seed_problem["problem"]
+    root = seed_problem["root_conjecture"]
 
     child1 = Conjecture(
         id=uuid4(),
@@ -47,11 +47,11 @@ async def seed_tree(db_session: AsyncSession, seed_project):
     db_session.add(child2)
     await db_session.flush()
 
-    return {"root": root, "child1": child1, "child2": child2, "project": project}
+    return {"root": root, "child1": child1, "child2": child2, "problem": project}
 
 
-async def test_get_conjecture_detail(client: AsyncClient, seed_project):
-    conj_id = str(seed_project["root_conjecture"].id)
+async def test_get_conjecture_detail(client: AsyncClient, seed_problem):
+    conj_id = str(seed_problem["root_conjecture"].id)
     resp = await client.get(f"/api/v1/conjectures/{conj_id}")
     assert resp.status_code == 200
     data = resp.json()
@@ -104,8 +104,8 @@ async def test_get_conjecture_not_found(client: AsyncClient):
 
 async def test_get_project_tree(client: AsyncClient, seed_tree):
     """Tree endpoint should return nested structure."""
-    project_id = str(seed_tree["project"].id)
-    resp = await client.get(f"/api/v1/projects/{project_id}/tree")
+    project_id = str(seed_tree["problem"].id)
+    resp = await client.get(f"/api/v1/problems/{project_id}/tree")
     assert resp.status_code == 200
     data = resp.json()
     root = data["root"]
@@ -119,16 +119,16 @@ async def test_get_project_tree(client: AsyncClient, seed_tree):
 
 async def test_list_project_conjectures(client: AsyncClient, seed_tree):
     """List conjectures for a project with filters."""
-    project_id = str(seed_tree["project"].id)
+    project_id = str(seed_tree["problem"].id)
 
     # List all (non-invalid)
-    resp = await client.get(f"/api/v1/projects/{project_id}/conjectures")
+    resp = await client.get(f"/api/v1/problems/{project_id}/conjectures")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] >= 3  # root + 2 children
 
     # Filter by status
-    resp = await client.get(f"/api/v1/projects/{project_id}/conjectures?status=open")
+    resp = await client.get(f"/api/v1/problems/{project_id}/conjectures?status=open")
     assert resp.status_code == 200
     data = resp.json()
     for conj in data["conjectures"]:

@@ -9,7 +9,7 @@ import {
   Zap,
   Loader2,
 } from 'lucide-react'
-import { useProjectActivity } from '../../hooks'
+import { useProblemActivity } from '../../hooks'
 import { formatDate, truncate } from '../../lib/utils'
 import { ROUTES } from '../../lib/constants'
 import ErrorBanner from '../ui/ErrorBanner'
@@ -70,11 +70,11 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
 }
 
 interface ActivityFeedProps {
-  projectId: string
+  problemId: string
 }
 
-export default function ActivityFeed({ projectId }: ActivityFeedProps) {
-  const { data, error, isLoading, mutate } = useProjectActivity(projectId)
+export default function ActivityFeed({ problemId }: ActivityFeedProps) {
+  const { data, error, isLoading, mutate } = useProblemActivity(problemId)
 
   if (isLoading) {
     return (

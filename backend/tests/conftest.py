@@ -14,7 +14,7 @@ from app.db.connection import Base
 from app.main import app
 from app.models.agent import Agent
 from app.models.conjecture import Conjecture
-from app.models.project import Project
+from app.models.problem import Problem
 
 TEST_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -96,23 +96,23 @@ async def seed_mega_agent(db_session: AsyncSession) -> dict:
 
 
 @pytest.fixture
-async def seed_project(db_session: AsyncSession, seed_agent: dict) -> dict:
-    """Create a project with a root conjecture and return both."""
-    project_id = uuid4()
+async def seed_problem(db_session: AsyncSession, seed_agent: dict) -> dict:
+    """Create a problem with a root conjecture and return both."""
+    problem_id = uuid4()
     conjecture_id = uuid4()
 
-    project = Project(
-        id=project_id,
-        title="Test Project",
-        description="A test project for unit tests.",
+    problem = Problem(
+        id=problem_id,
+        title="Test Problem",
+        description="A test problem for unit tests.",
         root_conjecture_id=None,
     )
-    db_session.add(project)
+    db_session.add(problem)
     await db_session.flush()
 
     conjecture = Conjecture(
         id=conjecture_id,
-        project_id=project_id,
+        project_id=problem_id,
         parent_id=None,
         lean_statement="∀ n : Nat, n + 0 = n",
         description="Root conjecture for testing.",
@@ -122,10 +122,10 @@ async def seed_project(db_session: AsyncSession, seed_agent: dict) -> dict:
     db_session.add(conjecture)
     await db_session.flush()
 
-    project.root_conjecture_id = conjecture_id
+    problem.root_conjecture_id = conjecture_id
     await db_session.flush()
 
-    return {"project": project, "root_conjecture": conjecture}
+    return {"problem": problem, "root_conjecture": conjecture}
 
 
 @pytest.fixture

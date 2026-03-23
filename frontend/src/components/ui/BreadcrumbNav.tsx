@@ -6,15 +6,15 @@ import type { ConjectureStatus } from '../../types'
 
 interface BreadcrumbNavProps {
   parent_chain: { id: string; lean_statement: string; description: string; status: ConjectureStatus }[]
-  projectId: string
-  projectTitle: string
+  problemId: string
+  problemTitle: string
 }
 
-export default function BreadcrumbNav({ parent_chain, projectId, projectTitle }: BreadcrumbNavProps) {
+export default function BreadcrumbNav({ parent_chain, problemId, problemTitle }: BreadcrumbNavProps) {
   return (
     <nav className="flex flex-wrap items-center gap-1 text-sm text-gray-500">
-      <Link to={ROUTES.PROJECT(projectId)} className="hover:text-gray-900">
-        {truncate(projectTitle, 30)}
+      <Link to={ROUTES.PROBLEM(problemId)} className="hover:text-gray-900">
+        {truncate(problemTitle, 30)}
       </Link>
       {parent_chain.map((ancestor) => (
         <span key={ancestor.id} className="flex items-center gap-1">

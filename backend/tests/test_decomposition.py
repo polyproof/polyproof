@@ -30,10 +30,10 @@ def mock_lean_sorry_pass(monkeypatch):
 
 
 async def test_create_decomposition(
-    db_session: AsyncSession, seed_project, seed_mega_agent, mock_lean_sorry_pass
+    db_session: AsyncSession, seed_problem, seed_mega_agent, mock_lean_sorry_pass
 ):
     """First decomposition: creates children, sets parent to decomposed."""
-    root = seed_project["root_conjecture"]
+    root = seed_problem["root_conjecture"]
     mega = seed_mega_agent["agent"]
 
     sorry_proof = (
@@ -66,10 +66,10 @@ async def test_create_decomposition(
 
 
 async def test_update_decomposition_diff(
-    db_session: AsyncSession, seed_project, seed_mega_agent, mock_lean_sorry_pass
+    db_session: AsyncSession, seed_problem, seed_mega_agent, mock_lean_sorry_pass
 ):
     """Update decomposition: preserves matching children, creates new, invalidates removed."""
-    root = seed_project["root_conjecture"]
+    root = seed_problem["root_conjecture"]
     mega = seed_mega_agent["agent"]
 
     sorry_proof_v1 = (
@@ -119,10 +119,10 @@ async def test_update_decomposition_diff(
 
 
 async def test_revert_decomposition(
-    db_session: AsyncSession, seed_project, seed_mega_agent, mock_lean_sorry_pass
+    db_session: AsyncSession, seed_problem, seed_mega_agent, mock_lean_sorry_pass
 ):
     """Revert: children invalidated, parent back to open."""
-    root = seed_project["root_conjecture"]
+    root = seed_problem["root_conjecture"]
     mega = seed_mega_agent["agent"]
 
     sorry_proof = (
@@ -159,10 +159,10 @@ async def test_revert_decomposition(
 
 
 async def test_reactivation(
-    db_session: AsyncSession, seed_project, seed_mega_agent, mock_lean_sorry_pass
+    db_session: AsyncSession, seed_problem, seed_mega_agent, mock_lean_sorry_pass
 ):
     """Re-add a previously invalidated child -> reactivated."""
-    root = seed_project["root_conjecture"]
+    root = seed_problem["root_conjecture"]
     mega = seed_mega_agent["agent"]
 
     sorry_proof_v1 = (
@@ -222,10 +222,10 @@ async def test_reactivation(
 
 
 async def test_duplicate_lean_statement_rejected(
-    db_session: AsyncSession, seed_project, seed_mega_agent, mock_lean_sorry_pass
+    db_session: AsyncSession, seed_problem, seed_mega_agent, mock_lean_sorry_pass
 ):
     """Duplicate lean_statements in children list should be rejected."""
-    root = seed_project["root_conjecture"]
+    root = seed_problem["root_conjecture"]
     mega = seed_mega_agent["agent"]
 
     sorry_proof = (
@@ -252,10 +252,10 @@ async def test_duplicate_lean_statement_rejected(
 
 
 async def test_decomposition_on_proved_conjecture(
-    db_session: AsyncSession, seed_project, seed_mega_agent, mock_lean_sorry_pass
+    db_session: AsyncSession, seed_problem, seed_mega_agent, mock_lean_sorry_pass
 ):
     """Cannot decompose a proved conjecture."""
-    root = seed_project["root_conjecture"]
+    root = seed_problem["root_conjecture"]
     root.status = "proved"
     await db_session.flush()
 

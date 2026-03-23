@@ -39,7 +39,7 @@ class DashboardAgent(BaseModel):
 class PlatformStats(BaseModel):
     total_agents: int
     total_proofs: int
-    active_projects: int
+    active_problems: int
     open_conjectures: int
 
 

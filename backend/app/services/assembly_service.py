@@ -177,10 +177,10 @@ async def check_and_assemble(conjecture_id: UUID, db: AsyncSession) -> bool:
         details={"children_ids": [str(cid) for cid in matched_children]},
     )
 
-    # Fire project_completed if parent is the root
-    from app.services.proof_service import _check_project_completed
+    # Fire problem_completed if parent is the root
+    from app.services.proof_service import _check_problem_completed
 
-    await _check_project_completed(parent, db)
+    await _check_problem_completed(parent, db)
 
     # Recurse upward: check if grandparent can now be assembled
     if parent.parent_id is not None:

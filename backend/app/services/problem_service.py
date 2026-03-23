@@ -1,4 +1,4 @@
-"""Project CRUD with computed progress."""
+"""Problem CRUD with computed progress."""
 
 from datetime import datetime
 from uuid import UUID
@@ -10,7 +10,7 @@ from app.models.activity_log import ActivityLog
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.conjecture import Conjecture
-from app.models.project import Project
+from app.models.problem import Problem
 
 
 async def create(
@@ -20,18 +20,18 @@ async def create(
     root_lean_statement: str,
     root_description: str,
     lean_header: str | None = None,
-) -> tuple[Project, Conjecture]:
-    """Create a project with its root conjecture.
+) -> tuple[Problem, Conjecture]:
+    """Create a problem with its root conjecture.
 
     Lean typechecking must be done before calling this.
-    Returns (project, root_conjecture).
+    Returns (problem, root_conjecture).
     """
-    project = Project(title=title, description=description, lean_header=lean_header)
-    db.add(project)
+    problem = Problem(title=title, description=description, lean_header=lean_header)
+    db.add(problem)
     await db.flush()
 
     root = Conjecture(
-        project_id=project.id,
+        project_id=problem.id,
         parent_id=None,
         lean_statement=root_lean_statement,
         description=root_description,
@@ -41,34 +41,34 @@ async def create(
     db.add(root)
     await db.flush()
 
-    project.root_conjecture_id = root.id
+    problem.root_conjecture_id = root.id
     await db.flush()
 
-    return project, root
+    return problem, root
 
 
-async def list_projects(
+async def list_problems(
     db: AsyncSession, limit: int = 20, offset: int = 0
 ) -> tuple[list[dict], int]:
-    """List projects with computed progress.
+    """List problems with computed progress.
 
-    Returns (project_dicts, total_count).
+    Returns (problem_dicts, total_count).
     """
-    total = await db.scalar(select(func.count()).select_from(Project))
+    total = await db.scalar(select(func.count()).select_from(Problem))
     total = total or 0
 
-    projects = (
+    problems = (
         await db.scalars(
-            select(Project).order_by(Project.created_at.desc()).limit(limit).offset(offset)
+            select(Problem).order_by(Problem.created_at.desc()).limit(limit).offset(offset)
         )
     ).all()
 
-    project_ids = [p.id for p in projects]
-    comment_counts = await _batch_comment_counts(db, project_ids)
-    active_agent_counts = await _batch_active_agent_counts(db, project_ids)
+    problem_ids = [p.id for p in problems]
+    comment_counts = await _batch_comment_counts(db, problem_ids)
+    active_agent_counts = await _batch_active_agent_counts(db, problem_ids)
 
     result = []
-    for p in projects:
+    for p in problems:
         stats = await _compute_progress(db, p.root_conjecture_id)
         root_status = await _get_root_status(db, p.root_conjecture_id)
         last_activity = await _get_last_activity(db, p.id)
@@ -92,23 +92,23 @@ async def list_projects(
     return result, total
 
 
-async def get_by_id(db: AsyncSession, project_id: UUID) -> Project | None:
-    """Get a project by ID."""
-    return await db.get(Project, project_id)
+async def get_by_id(db: AsyncSession, problem_id: UUID) -> Problem | None:
+    """Get a problem by ID."""
+    return await db.get(Problem, problem_id)
 
 
-async def get_detail(db: AsyncSession, project: Project) -> dict:
-    """Get project detail with full stats."""
-    stats = await _compute_progress(db, project.root_conjecture_id)
-    status_counts = await _count_by_status(db, project.id)
-    root_status = await _get_root_status(db, project.root_conjecture_id)
-    last_activity = await _get_last_activity(db, project.id)
+async def get_detail(db: AsyncSession, problem: Problem) -> dict:
+    """Get problem detail with full stats."""
+    stats = await _compute_progress(db, problem.root_conjecture_id)
+    status_counts = await _count_by_status(db, problem.id)
+    root_status = await _get_root_status(db, problem.root_conjecture_id)
+    last_activity = await _get_last_activity(db, problem.id)
 
     return {
-        "id": project.id,
-        "title": project.title,
-        "description": project.description,
-        "root_conjecture_id": project.root_conjecture_id,
+        "id": problem.id,
+        "title": problem.title,
+        "description": problem.description,
+        "root_conjecture_id": problem.root_conjecture_id,
         "progress": stats["progress"],
         "root_status": root_status,
         "total_conjectures": sum(status_counts.values()),
@@ -120,7 +120,7 @@ async def get_detail(db: AsyncSession, project: Project) -> dict:
         "total_leaves": stats["total_leaves"],
         "proved_leaves": stats["proved_leaves"],
         "last_activity_at": last_activity,
-        "created_at": project.created_at,
+        "created_at": problem.created_at,
     }
 
 
@@ -159,11 +159,11 @@ async def _compute_progress(db: AsyncSession, root_conjecture_id: UUID | None) -
     return {"total_leaves": total, "proved_leaves": proved, "progress": progress}
 
 
-async def _count_by_status(db: AsyncSession, project_id: UUID) -> dict[str, int]:
-    """Count conjectures by status for a project."""
+async def _count_by_status(db: AsyncSession, problem_id: UUID) -> dict[str, int]:
+    """Count conjectures by status for a problem."""
     result = await db.execute(
         select(Conjecture.status, func.count())
-        .where(Conjecture.project_id == project_id)
+        .where(Conjecture.project_id == problem_id)
         .group_by(Conjecture.status)
     )
     return dict(result.all())
@@ -177,49 +177,49 @@ async def _get_root_status(db: AsyncSession, root_id: UUID | None) -> str | None
     return root.status if root else None
 
 
-async def _get_last_activity(db: AsyncSession, project_id: UUID) -> datetime | None:
-    """Get the timestamp of the latest activity for a project.
+async def _get_last_activity(db: AsyncSession, problem_id: UUID) -> datetime | None:
+    """Get the timestamp of the latest activity for a problem.
 
     Checks both comments and activity_log.
     """
-    # Check latest comment on conjectures in this project or directly on the project
+    # Check latest comment on conjectures in this problem or directly on the problem
     conj_comment_q = (
         select(func.max(Comment.created_at))
         .join(Conjecture, Comment.conjecture_id == Conjecture.id)
-        .where(Conjecture.project_id == project_id)
+        .where(Conjecture.project_id == problem_id)
     )
-    proj_comment_q = select(func.max(Comment.created_at)).where(Comment.project_id == project_id)
+    prob_comment_q = select(func.max(Comment.created_at)).where(Comment.project_id == problem_id)
     activity_q = select(func.max(ActivityLog.created_at)).where(
-        ActivityLog.project_id == project_id
+        ActivityLog.project_id == problem_id
     )
 
     conj_ts = await db.scalar(conj_comment_q)
-    proj_ts = await db.scalar(proj_comment_q)
+    proj_ts = await db.scalar(prob_comment_q)
     act_ts = await db.scalar(activity_q)
 
     timestamps = [ts for ts in [conj_ts, proj_ts, act_ts] if ts is not None]
     return max(timestamps) if timestamps else None
 
 
-async def _batch_comment_counts(db: AsyncSession, project_ids: list[UUID]) -> dict[UUID, int]:
-    """Total comments for multiple projects in two queries instead of 2*N."""
-    if not project_ids:
+async def _batch_comment_counts(db: AsyncSession, problem_ids: list[UUID]) -> dict[UUID, int]:
+    """Total comments for multiple problems in two queries instead of 2*N."""
+    if not problem_ids:
         return {}
 
-    # Project-level comments
-    proj_rows = await db.execute(
+    # Problem-level comments
+    prob_rows = await db.execute(
         select(Comment.project_id, func.count())
-        .where(Comment.project_id.in_(project_ids))
+        .where(Comment.project_id.in_(problem_ids))
         .group_by(Comment.project_id)
     )
-    counts: dict[UUID, int] = dict(proj_rows.all())
+    counts: dict[UUID, int] = dict(prob_rows.all())
 
     # Conjecture-level comments
     conj_rows = await db.execute(
         select(Conjecture.project_id, func.count())
         .select_from(Comment)
         .join(Conjecture, Comment.conjecture_id == Conjecture.id)
-        .where(Conjecture.project_id.in_(project_ids))
+        .where(Conjecture.project_id.in_(problem_ids))
         .group_by(Conjecture.project_id)
     )
     for pid, cnt in conj_rows.all():
@@ -228,9 +228,9 @@ async def _batch_comment_counts(db: AsyncSession, project_ids: list[UUID]) -> di
     return counts
 
 
-async def _batch_active_agent_counts(db: AsyncSession, project_ids: list[UUID]) -> dict[UUID, int]:
-    """Distinct active agents for multiple projects in one query."""
-    if not project_ids:
+async def _batch_active_agent_counts(db: AsyncSession, problem_ids: list[UUID]) -> dict[UUID, int]:
+    """Distinct active agents for multiple problems in one query."""
+    if not problem_ids:
         return {}
 
     rows = await db.execute(
@@ -239,7 +239,7 @@ async def _batch_active_agent_counts(db: AsyncSession, project_ids: list[UUID]) 
             func.count(func.distinct(ActivityLog.agent_id)),
         )
         .where(
-            ActivityLog.project_id.in_(project_ids),
+            ActivityLog.project_id.in_(problem_ids),
             ActivityLog.agent_id.is_not(None),
         )
         .group_by(ActivityLog.project_id)
@@ -247,25 +247,25 @@ async def _batch_active_agent_counts(db: AsyncSession, project_ids: list[UUID]) 
     return dict(rows.all())
 
 
-async def get_overview(db: AsyncSession, project: Project) -> dict:
-    """Build the project overview: project summary + flat tree with per-node metrics.
+async def get_overview(db: AsyncSession, problem: Problem) -> dict:
+    """Build the problem overview: problem summary + flat tree with per-node metrics.
 
     Each node includes: description, status, priority, comment_count,
     last_activity_at, proved_by (agent handle), parent_id, summary (latest is_summary comment body).
     """
-    stats = await _compute_progress(db, project.root_conjecture_id)
-    root_status = await _get_root_status(db, project.root_conjecture_id)
+    stats = await _compute_progress(db, problem.root_conjecture_id)
+    root_status = await _get_root_status(db, problem.root_conjecture_id)
 
-    project_data = {
-        "id": project.id,
-        "title": project.title,
-        "description": project.description,
+    problem_data = {
+        "id": problem.id,
+        "title": problem.title,
+        "description": problem.description,
         "status": root_status or "open",
         "progress": stats["progress"],
     }
 
-    if not project.root_conjecture_id:
-        return {"project": project_data, "tree": []}
+    if not problem.root_conjecture_id:
+        return {"problem": problem_data, "tree": []}
 
     # Fetch all conjectures in the tree (including invalid, for visibility)
     tree_query = text("""
@@ -278,7 +278,7 @@ async def get_overview(db: AsyncSession, project: Project) -> dict:
         )
         SELECT * FROM tree
     """)
-    result = await db.execute(tree_query, {"root_id": str(project.root_conjecture_id)})
+    result = await db.execute(tree_query, {"root_id": str(problem.root_conjecture_id)})
     rows = result.all()
 
     conjecture_ids = [row.id for row in rows]
@@ -344,4 +344,4 @@ async def get_overview(db: AsyncSession, project: Project) -> dict:
             }
         )
 
-    return {"project": project_data, "tree": tree_nodes}
+    return {"problem": problem_data, "tree": tree_nodes}

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useSWRConfig } from 'swr'
-import { useProject, useProjectTree, useProjectOverview } from '../hooks'
+import { useProblem, useProblemTree, useProblemOverview } from '../hooks'
 import Layout from '../components/layout/Layout'
 import ProgressBar from '../components/ui/ProgressBar'
 import ErrorBanner from '../components/ui/ErrorBanner'
@@ -12,11 +12,11 @@ import MarkdownContent from '../components/ui/MarkdownContent'
 import type { ReferenceMap } from '../components/ui/MarkdownContent'
 import { flattenTree } from '../lib/utils'
 
-export default function ProjectPage() {
+export default function ProblemPage() {
   const { id } = useParams<{ id: string }>()
-  const { data: project, error: projectError, isLoading: projectLoading, mutate: mutateProject } = useProject(id!)
-  const { data: treeData, error: treeError, isLoading: treeLoading } = useProjectTree(id!)
-  const { data: overview } = useProjectOverview(id!)
+  const { data: problem, error: problemError, isLoading: problemLoading, mutate: mutateProblem } = useProblem(id!)
+  const { data: treeData, error: treeError, isLoading: treeLoading } = useProblemTree(id!)
+  const { data: overview } = useProblemOverview(id!)
   const { mutate: globalMutate } = useSWRConfig()
 
   const flatNodes = useMemo(() => {
@@ -24,7 +24,7 @@ export default function ProjectPage() {
     return flattenTree(treeData.root, id)
   }, [treeData, id])
 
-  // Build UUID → description map for resolving conjecture references
+  // Build UUID -> description map for resolving conjecture references
   const refs: ReferenceMap = useMemo(() => {
     const map: ReferenceMap = {}
     if (overview?.tree) {
@@ -35,7 +35,7 @@ export default function ProjectPage() {
     return map
   }, [overview])
 
-  if (projectLoading || treeLoading) {
+  if (problemLoading || treeLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center py-20">
@@ -45,25 +45,25 @@ export default function ProjectPage() {
     )
   }
 
-  if (projectError || treeError) {
+  if (problemError || treeError) {
     return (
       <Layout>
         <ErrorBanner
-          message="Failed to load project."
+          message="Failed to load problem."
           onRetry={() => {
-            mutateProject()
-            globalMutate(['project-tree', id])
+            mutateProblem()
+            globalMutate(['problem-tree', id])
           }}
         />
       </Layout>
     )
   }
 
-  if (!project) {
+  if (!problem) {
     return (
       <Layout>
         <div className="py-12 text-center">
-          <h1 className="text-xl font-bold text-gray-900">Project not found</h1>
+          <h1 className="text-xl font-bold text-gray-900">Problem not found</h1>
           <a href="/" className="mt-2 inline-block text-blue-600 hover:underline">Go home</a>
         </div>
       </Layout>
@@ -74,14 +74,14 @@ export default function ProjectPage() {
     <Layout>
       {/* Header */}
       <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
-        {project.description && (
-          <div className="mt-1 text-sm text-gray-600"><MarkdownContent>{project.description}</MarkdownContent></div>
+        <h1 className="text-2xl font-bold text-gray-900">{problem.title}</h1>
+        {problem.description && (
+          <div className="mt-1 text-sm text-gray-600"><MarkdownContent>{problem.description}</MarkdownContent></div>
         )}
         <div className="mt-3">
           <ProgressBar
-            percent={project.progress}
-            label={`${project.proved_leaves}/${project.total_leaves} leaves proved`}
+            percent={problem.progress}
+            label={`${problem.proved_leaves}/${problem.total_leaves} leaves proved`}
           />
         </div>
       </div>
@@ -91,7 +91,7 @@ export default function ProjectPage() {
         <ProofTree tree={flatNodes} />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-400">
-          No conjectures in this project yet.
+          No conjectures in this problem yet.
         </div>
       )}
 
@@ -99,7 +99,7 @@ export default function ProjectPage() {
       {overview?.tree?.[0]?.summary && (
         <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
           <div className="mb-2">
-            <span className="text-xs font-semibold uppercase text-amber-700">Project Summary</span>
+            <span className="text-xs font-semibold uppercase text-amber-700">Problem Summary</span>
           </div>
           <div className="text-sm text-gray-700">
             <MarkdownContent references={refs}>{overview.tree[0].summary}</MarkdownContent>
@@ -110,7 +110,7 @@ export default function ProjectPage() {
       {/* Activity Feed */}
       <div className="mt-6">
         <h2 className="mb-3 text-sm font-semibold text-gray-500">Activity Feed</h2>
-        <ActivityFeed projectId={id!} />
+        <ActivityFeed problemId={id!} />
       </div>
     </Layout>
   )

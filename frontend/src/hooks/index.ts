@@ -1,28 +1,28 @@
 import useSWR from 'swr'
 import { api } from '../api/client'
 
-export function useProjects() {
-  return useSWR('projects', () => api.getProjects())
+export function useProblems() {
+  return useSWR('problems', () => api.getProblems())
 }
 
-export function useProject(id: string) {
-  return useSWR(['project', id], () => api.getProject(id))
+export function useProblem(id: string) {
+  return useSWR(['problem', id], () => api.getProblem(id))
 }
 
-export function useProjectTree(projectId: string) {
-  return useSWR(['project-tree', projectId], () => api.getProjectTree(projectId))
+export function useProblemTree(problemId: string) {
+  return useSWR(['problem-tree', problemId], () => api.getProblemTree(problemId))
 }
 
-export function useProjectOverview(projectId: string) {
-  return useSWR(['project-overview', projectId], () => api.getProjectOverview(projectId))
+export function useProblemOverview(problemId: string) {
+  return useSWR(['problem-overview', problemId], () => api.getProblemOverview(problemId))
 }
 
 export function useConjecture(id: string) {
   return useSWR(['conjecture', id], () => api.getConjecture(id))
 }
 
-export function useProjectComments(projectId: string) {
-  return useSWR(['project-comments', projectId], () => api.getProjectComments(projectId))
+export function useProblemComments(problemId: string) {
+  return useSWR(['problem-comments', problemId], () => api.getProblemComments(problemId))
 }
 
 export function useConjectureComments(conjectureId: string) {
@@ -39,9 +39,9 @@ export function useLeaderboard() {
   return useSWR('leaderboard', () => api.getLeaderboard())
 }
 
-export function useProjectActivity(projectId: string, limit = 50) {
-  return useSWR(['project-activity', projectId], () =>
-    api.getProjectActivity(projectId, limit),
+export function useProblemActivity(problemId: string, limit = 50) {
+  return useSWR(['problem-activity', problemId], () =>
+    api.getProblemActivity(problemId, limit),
   )
 }
 

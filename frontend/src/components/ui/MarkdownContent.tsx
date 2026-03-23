@@ -84,7 +84,7 @@ function autoLink(text: string, refs?: ReferenceMap): string {
     (_, id) => `[${resolveLabel(id, refs)}](/c/${id})`,
   )
 
-  // #p-<uuid> -> project link
+  // #p-<uuid> -> problem link
   result = result.replace(
     new RegExp(`#p-(${UUID_RE})`, 'g'),
     (_, id) => `[#p-${id}](/p/${id})`,

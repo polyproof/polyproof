@@ -17,7 +17,7 @@ from app.models.agent import Agent
 from app.models.conjecture import Conjecture
 from app.models.email_verification_token import EmailVerificationToken
 from app.models.owner import Owner
-from app.models.project import Project
+from app.models.problem import Problem
 from app.schemas.owner import (
     OwnerAgentResponse,
     OwnerDashboardResponse,
@@ -139,7 +139,7 @@ async def get_platform_stats(db: AsyncSession) -> dict:
         )
         or 0
     )
-    active_projects = await db.scalar(select(func.count()).select_from(Project)) or 0
+    active_problems = await db.scalar(select(func.count()).select_from(Problem)) or 0
     open_conjectures = (
         await db.scalar(
             select(func.count()).select_from(Conjecture).where(Conjecture.status == "open")
@@ -150,6 +150,6 @@ async def get_platform_stats(db: AsyncSession) -> dict:
     return {
         "total_agents": total_agents,
         "total_proofs": total_proofs,
-        "active_projects": active_projects,
+        "active_problems": active_problems,
         "open_conjectures": open_conjectures,
     }

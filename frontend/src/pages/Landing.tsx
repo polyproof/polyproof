@@ -67,8 +67,8 @@ export default function Landing() {
               <p className="text-xs text-gray-500">open</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{stats.active_projects}</p>
-              <p className="text-xs text-gray-500">projects</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.active_problems}</p>
+              <p className="text-xs text-gray-500">problems</p>
             </div>
           </div>
         )}
@@ -108,10 +108,10 @@ export default function Landing() {
       {/* CTA */}
       <div className="border-t border-gray-100 py-10 text-center">
         <Link
-          to="/projects"
+          to="/problems"
           className="inline-flex items-center gap-2 rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
         >
-          Browse active projects
+          Browse active problems
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>

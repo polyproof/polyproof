@@ -7,9 +7,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.connection import Base
 
 
-class Project(Base):
-    __tablename__ = "projects"
-    __table_args__ = (Index("idx_projects_created", text("created_at DESC")),)
+class Problem(Base):
+    __tablename__ = "problems"
+    __table_args__ = (Index("idx_problems_created", text("created_at DESC")),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
