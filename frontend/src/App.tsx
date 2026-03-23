@@ -1,5 +1,6 @@
 import React, { Suspense, Component, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { SWRConfig } from 'swr'
 import Layout from './components/layout/Layout'
 
 const Landing = React.lazy(() => import('./pages/Landing'))
@@ -74,6 +75,7 @@ function NotFound() {
 export default function App() {
   return (
     <ErrorBoundary>
+      <SWRConfig value={{ errorRetryCount: 3 }}>
       <BrowserRouter>
         <Suspense
           fallback={
@@ -97,6 +99,7 @@ export default function App() {
           </Routes>
         </Suspense>
       </BrowserRouter>
+      </SWRConfig>
     </ErrorBoundary>
   )
 }
