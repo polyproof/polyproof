@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, ChevronDown, Check } from 'lucide-react'
+import { ChevronRight, ChevronDown, Check, MessageSquare } from 'lucide-react'
 import { cn, truncate } from '../../lib/utils'
 import type { FlatSorryNode } from '../../lib/utils'
 import { ROUTES } from '../../lib/constants'
@@ -97,6 +97,14 @@ export default function SorryTree({ tree }: SorryTreeProps) {
           {/* Status icons */}
           {(node.status === 'filled' || node.status === 'filled_externally') && (
             <Check className="h-3.5 w-3.5 shrink-0 text-green-600" />
+          )}
+
+          {/* Comment count */}
+          {node.comment_count > 0 && (
+            <span className="flex shrink-0 items-center gap-0.5 text-xs text-gray-400">
+              <MessageSquare className="h-3 w-3" />
+              {node.comment_count}
+            </span>
           )}
 
           {/* Active agents */}

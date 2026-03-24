@@ -48,6 +48,7 @@ export interface FlatSorryNode {
   priority: string
   filled_by?: string
   active_agents: number
+  comment_count: number
   parent_sorry_id?: string
   child_count: number
   filled_child_count: number
@@ -73,6 +74,7 @@ export function flattenSorryTree(
       priority: node.priority,
       filled_by: node.filled_by,
       active_agents: node.active_agents,
+      comment_count: node.comment_count,
       parent_sorry_id: parentId,
       child_count: node.children.length,
       filled_child_count: filledChildCount,

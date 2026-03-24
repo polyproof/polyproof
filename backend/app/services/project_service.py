@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.activity_log import ActivityLog
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.project import Project
@@ -62,10 +63,13 @@ async def list_projects(
 
     project_ids = [p.id for p in projects]
     sorry_stats = await _batch_sorry_stats(db, project_ids)
+    activity_stats = await _batch_activity_stats(db, project_ids)
 
     result = []
     for p in projects:
         stats = sorry_stats.get(p.id, {"total": 0, "filled": 0})
+        empty_stats = {"agent_count": 0, "comment_count": 0, "last_activity_at": None}
+        a_stats = activity_stats.get(p.id, empty_stats)
         total_sorries = stats["total"]
         filled_sorries = stats["filled"]
         progress = filled_sorries / total_sorries if total_sorries > 0 else 0.0
@@ -82,6 +86,9 @@ async def list_projects(
                 "total_sorries": total_sorries,
                 "filled_sorries": filled_sorries,
                 "progress": progress,
+                "agent_count": a_stats["agent_count"],
+                "comment_count": a_stats["comment_count"],
+                "last_activity_at": a_stats["last_activity_at"],
                 "created_at": p.created_at,
             }
         )
@@ -100,6 +107,10 @@ async def get_detail(db: AsyncSession, project: Project) -> dict:
     total_sorries = sum(status_counts.values())
     filled_sorries = status_counts.get("filled", 0) + status_counts.get("filled_externally", 0)
     progress = filled_sorries / total_sorries if total_sorries > 0 else 0.0
+
+    activity_stats = await _batch_activity_stats(db, [project.id])
+    empty_stats = {"agent_count": 0, "comment_count": 0, "last_activity_at": None}
+    a_stats = activity_stats.get(project.id, empty_stats)
 
     files = (
         await db.scalars(
@@ -134,6 +145,9 @@ async def get_detail(db: AsyncSession, project: Project) -> dict:
         "total_sorries": total_sorries,
         "filled_sorries": filled_sorries,
         "progress": progress,
+        "agent_count": a_stats["agent_count"],
+        "comment_count": a_stats["comment_count"],
+        "last_activity_at": a_stats["last_activity_at"],
         "open_sorries": status_counts.get("open", 0),
         "decomposed_sorries": status_counts.get("decomposed", 0),
         "filled_externally_sorries": status_counts.get("filled_externally", 0),
@@ -155,6 +169,10 @@ async def get_overview(db: AsyncSession, project: Project) -> dict:
     filled_sorries = stats["filled"]
     progress = filled_sorries / total_sorries if total_sorries > 0 else 0.0
 
+    activity_stats = await _batch_activity_stats(db, [project.id])
+    empty_stats = {"agent_count": 0, "comment_count": 0, "last_activity_at": None}
+    a_stats = activity_stats.get(project.id, empty_stats)
+
     project_data = {
         "id": project.id,
         "title": project.title,
@@ -166,6 +184,9 @@ async def get_overview(db: AsyncSession, project: Project) -> dict:
         "total_sorries": total_sorries,
         "filled_sorries": filled_sorries,
         "progress": progress,
+        "agent_count": a_stats["agent_count"],
+        "comment_count": a_stats["comment_count"],
+        "last_activity_at": a_stats["last_activity_at"],
         "created_at": project.created_at,
     }
 
@@ -239,6 +260,70 @@ async def _count_by_status(db: AsyncSession, project_id: UUID) -> dict[str, int]
         .group_by(Sorry.status)
     )
     return dict(result.all())
+
+
+async def _batch_activity_stats(
+    db: AsyncSession, project_ids: list[UUID]
+) -> dict[UUID, dict]:
+    """Batch compute agent count, comment count, and last activity per project."""
+    if not project_ids:
+        return {}
+
+    stats: dict[UUID, dict] = {}
+    _default = {"agent_count": 0, "comment_count": 0, "last_activity_at": None}
+
+    # Unique agents + last activity per project (single activity_log query)
+    activity_result = await db.execute(
+        select(
+            ActivityLog.project_id,
+            func.count(
+                func.distinct(ActivityLog.agent_id)
+            ).filter(ActivityLog.agent_id.is_not(None)),
+            func.max(ActivityLog.created_at),
+        )
+        .where(ActivityLog.project_id.in_(project_ids))
+        .group_by(ActivityLog.project_id)
+    )
+    for pid, agent_count, last_at in activity_result.all():
+        stats.setdefault(pid, {**_default})
+        stats[pid]["agent_count"] = agent_count
+        stats[pid]["last_activity_at"] = last_at
+
+    # Comment counts per project (project-level + sorry-level)
+    sorry_comment_q = (
+        select(
+            Sorry.project_id.label("pid"),
+            func.count().label("cnt"),
+        )
+        .select_from(Comment)
+        .join(Sorry, Comment.sorry_id == Sorry.id)
+        .where(
+            Sorry.project_id.in_(project_ids),
+            Comment.sorry_id.is_not(None),
+        )
+        .group_by(Sorry.project_id)
+    )
+    project_comment_q = (
+        select(
+            Comment.project_id.label("pid"),
+            func.count().label("cnt"),
+        )
+        .where(
+            Comment.project_id.in_(project_ids),
+            Comment.project_id.is_not(None),
+        )
+        .group_by(Comment.project_id)
+    )
+    combined = sorry_comment_q.union_all(project_comment_q).subquery()
+    comment_result = await db.execute(
+        select(combined.c.pid, func.sum(combined.c.cnt))
+        .group_by(combined.c.pid)
+    )
+    for pid, count in comment_result.all():
+        stats.setdefault(pid, {**_default})
+        stats[pid]["comment_count"] = count
+
+    return stats
 
 
 async def _batch_sorry_stats(

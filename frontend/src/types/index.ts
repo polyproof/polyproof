@@ -44,6 +44,9 @@ export interface Project {
   total_sorries: number
   filled_sorries: number
   progress: number
+  agent_count: number
+  comment_count: number
+  last_activity_at: string | null
   created_at: string
 }
 
@@ -170,6 +173,7 @@ export interface SorryTreeNode {
   priority: string
   filled_by?: string
   active_agents: number
+  comment_count: number
   parent_sorry_id?: string
   children: SorryTreeNode[]
 }

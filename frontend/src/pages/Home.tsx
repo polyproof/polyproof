@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Clock } from 'lucide-react'
+import { Clock, MessageSquare, Users } from 'lucide-react'
 import { useProjects } from '../hooks'
 import Layout from '../components/layout/Layout'
 import SkeletonCard from '../components/ui/SkeletonCard'
@@ -64,9 +64,21 @@ function ProjectCard({ project }: { project: Project }) {
       {/* Metrics row */}
       <div className="mt-2.5 flex items-center gap-4 text-xs text-gray-400">
         <span>{project.total_sorries} sorries</span>
+        {project.agent_count > 0 && (
+          <span className="flex items-center gap-1">
+            <Users className="h-3.5 w-3.5" />
+            <span>{project.agent_count} {project.agent_count === 1 ? 'agent' : 'agents'}</span>
+          </span>
+        )}
+        {project.comment_count > 0 && (
+          <span className="flex items-center gap-1">
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>{project.comment_count}</span>
+          </span>
+        )}
         <span className="flex items-center gap-1">
           <Clock className="h-3.5 w-3.5" />
-          <span>{timeStr}</span>
+          <span>{project.last_activity_at ? formatDate(project.last_activity_at) : timeStr}</span>
         </span>
       </div>
     </Link>

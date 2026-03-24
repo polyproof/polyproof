@@ -38,6 +38,9 @@ class ProjectResponse(BaseModel):
     total_sorries: int = 0
     filled_sorries: int = 0
     progress: float = 0.0
+    agent_count: int = 0
+    comment_count: int = 0
+    last_activity_at: datetime | None = None
     created_at: datetime
 
 

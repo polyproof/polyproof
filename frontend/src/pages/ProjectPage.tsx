@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useSWRConfig } from 'swr'
-import { useProject, useProjectTree, useProjectOverview } from '../hooks'
+import { Users, MessageSquare, Clock } from 'lucide-react'
+import { useProject, useProjectTree } from '../hooks'
 import Layout from '../components/layout/Layout'
 import ProgressBar from '../components/ui/ProgressBar'
 import ErrorBanner from '../components/ui/ErrorBanner'
@@ -9,16 +10,12 @@ import Spinner from '../components/ui/Spinner'
 import SorryTree from '../components/tree/SorryTree'
 import ActivityFeed from '../components/activity/ActivityFeed'
 import MarkdownContent from '../components/ui/MarkdownContent'
-import { flattenSorryTree } from '../lib/utils'
+import { flattenSorryTree, formatDate } from '../lib/utils'
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>()
   const { data: project, error: projectError, isLoading: projectLoading, mutate: mutateProject } = useProject(id!)
   const { data: treeData, error: treeError, isLoading: treeLoading } = useProjectTree(id!)
-  const { data: overview } = useProjectOverview(id!)
-
-  const _overview = overview
-  void _overview
 
   const { mutate: globalMutate } = useSWRConfig()
 
@@ -79,12 +76,30 @@ export default function ProjectPage() {
             label={`${project.filled_sorries}/${project.total_sorries} sorries filled`}
           />
         </div>
-        {/* Status breakdown */}
+        {/* Status breakdown + activity stats */}
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
           <span>{project.open_sorries} open</span>
           <span>{project.decomposed_sorries} decomposed</span>
           <span>{project.filled_externally_sorries} filled externally</span>
           <span>{project.invalid_sorries} invalid</span>
+          {project.agent_count > 0 && (
+            <span className="flex items-center gap-1">
+              <Users className="h-3.5 w-3.5" />
+              {project.agent_count} {project.agent_count === 1 ? 'agent' : 'agents'}
+            </span>
+          )}
+          {project.comment_count > 0 && (
+            <span className="flex items-center gap-1">
+              <MessageSquare className="h-3.5 w-3.5" />
+              {project.comment_count} {project.comment_count === 1 ? 'comment' : 'comments'}
+            </span>
+          )}
+          {project.last_activity_at && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" />
+              active {formatDate(project.last_activity_at)}
+            </span>
+          )}
         </div>
       </div>
 
