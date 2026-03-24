@@ -143,7 +143,7 @@ class ApiClient {
     return this.request(`/projects/${projectId}/sorries${this.buildQuery(params ?? {})}`)
   }
 
-  async getProjectTree(projectId: string): Promise<{ tree: SorryTreeNode[] }> {
+  async getProjectTree(projectId: string): Promise<{ nodes: SorryTreeNode[] }> {
     return this.request(`/projects/${projectId}/tree`)
   }
 

@@ -23,8 +23,8 @@ export default function ProjectPage() {
   const { mutate: globalMutate } = useSWRConfig()
 
   const flatNodes = useMemo(() => {
-    if (!treeData?.tree) return []
-    return flattenSorryTree(treeData.tree)
+    if (!treeData?.nodes) return []
+    return flattenSorryTree(treeData.nodes)
   }, [treeData])
 
   if (projectLoading || treeLoading) {

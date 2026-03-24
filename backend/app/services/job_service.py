@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.job import Job
 from app.models.sorry import Sorry
+from app.models.tracked_file import TrackedFile
 from app.services import activity_service, lean_client
 
 logger = logging.getLogger(__name__)
@@ -78,19 +79,21 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
     )
     await db.flush()
 
-    # Step 3: Read file from workspace and build compilation code
-    # For MVP, we construct the compilation code from the sorry's context
+    # Step 3: Read sorry + tracked file for compilation context
     sorry = await db.get(Sorry, sorry_id)
     if sorry is None:
         return await _fail_job(db, job, "Sorry not found after lock")
 
+    tracked_file = await db.get(TrackedFile, sorry.file_id)
+    import_path = tracked_file.file_path if tracked_file else None
+
     # Step 4: Compile via Lean server
-    # Use verify_fill which wraps the tactics with the sorry's goal context
     result = await lean_client.verify_fill(
         goal_state=sorry.goal_state,
         tactics=job.tactics,
         sorry_id=sorry_id,
         project_id=job.project_id,
+        import_path=import_path,
     )
 
     # Step 5: Handle compilation result

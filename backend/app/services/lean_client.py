@@ -71,6 +71,7 @@ async def verify_fill(
     sorry_id: UUID,
     project_id: UUID | None = None,
     allow_sorry: bool = False,
+    import_path: str | None = None,
 ) -> LeanResult:
     """Verify a fill against a sorry's goal state.
 
@@ -96,7 +97,7 @@ async def verify_fill(
         if rejected:
             return rejected
 
-    header = _build_header(project_id)
+    header = _build_header(project_id, import_path=import_path)
     safe_id = str(sorry_id).replace("-", "_")
     indented = "\n  ".join(tactics.splitlines())
     code = (
@@ -115,28 +116,30 @@ async def verify_fill(
 async def verify_freeform(
     code: str,
     project_id: UUID | None = None,
+    import_path: str | None = None,
 ) -> LeanResult:
     """Compile code as-is for the /verify endpoint (freeform).
 
     Rejects sorry and forbidden keywords.
     """
     if project_id is not None:
-        header = _build_header(project_id)
+        header = _build_header(project_id, import_path=import_path)
         if "import" not in code[:50]:
             code = header + code
     return await _send_to_lean(code, allow_sorry=False)
 
 
-def _build_header(project_id: UUID | None = None) -> str:
-    """Build the Lean file header (import + optional project-level context).
+def _build_header(project_id: UUID | None = None, *, import_path: str | None = None) -> str:
+    """Build the Lean file header from the file path.
 
-    In v5, the header is project-aware. For now we use a standard Mathlib import.
-    Future: load project-specific header from workspace.
+    Converts a file path like ``Carleson/Foo/Bar.lean`` into
+    ``import Carleson.Foo.Bar``. Falls back to ``import Mathlib`` if no
+    import_path is provided.
     """
-    parts = ["import Mathlib\n"]
-    # TODO: load project-specific imports from workspace_path
-    parts.append("\n")
-    return "\n".join(parts)
+    if import_path:
+        module = import_path.replace("/", ".").removesuffix(".lean")
+        return f"import {module}\n\n"
+    return "import Mathlib\n\n"
 
 
 # ---------------------------------------------------------------------------

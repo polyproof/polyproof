@@ -6,7 +6,16 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 from app.config import settings
 from app.db.connection import Base
-from app.models import ActivityLog, Agent, Comment, Job, Owner, Project, Sorry, TrackedFile  # noqa: F401
+from app.models import (  # noqa: F401
+    ActivityLog,
+    Agent,
+    Comment,
+    Job,
+    Owner,
+    Project,
+    Sorry,
+    TrackedFile,
+)
 
 config = context.config
 

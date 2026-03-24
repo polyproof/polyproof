@@ -1,8 +1,10 @@
 """Project CRUD, sorries listing, tree, activity, and overview endpoints."""
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from app.api.deps import DbSession
 from app.api.rate_limit import ip_limiter
@@ -21,6 +23,17 @@ from app.schemas.sorry import SorryListResponse, SorryResponse
 from app.services import activity_service, project_service, sorry_service
 
 router = APIRouter()
+
+
+class SorryImport(BaseModel):
+    file_path: str = Field(min_length=1)
+    declaration_name: str = Field(min_length=1)
+    sorry_index: int = 0
+    goal_state: str = Field(min_length=1)
+    local_context: str | None = None
+    line: int | None = None
+    col: int | None = None
+    priority: str = "normal"
 
 
 async def _require_admin(request: Request) -> None:
@@ -164,3 +177,23 @@ async def get_project_overview(
         raise NotFoundError("Project")
     data = await project_service.get_overview(db, project)
     return ProjectOverview(**data)
+
+
+@router.post("/{project_id}/import-sorries")
+async def import_sorries(
+    request: Request,
+    project_id: UUID,
+    body: list[SorryImport],
+    db: DbSession,
+) -> dict[str, Any]:
+    """Bulk-import sorry records for a project. Admin only."""
+    await _require_admin(request)
+
+    project = await project_service.get_by_id(db, project_id)
+    if not project:
+        raise NotFoundError("Project")
+
+    result = await project_service.import_sorries(
+        db, project_id, [s.model_dump() for s in body]
+    )
+    return result

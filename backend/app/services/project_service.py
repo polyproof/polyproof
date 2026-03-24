@@ -1,8 +1,9 @@
 """Project CRUD with computed sorry progress."""
 
+import hashlib
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.agent import Agent
@@ -266,3 +267,95 @@ async def _batch_sorry_stats(
     for row in result.all():
         stats[row[0]] = {"total": row[1], "filled": row[2]}
     return stats
+
+
+async def import_sorries(
+    db: AsyncSession, project_id: UUID, sorries: list[dict]
+) -> dict:
+    """Bulk-import sorry records for a project.
+
+    Each dict in ``sorries`` should have:
+      file_path, declaration_name, sorry_index (default 0),
+      goal_state, local_context (optional), line (optional), col (optional),
+      priority (default "normal").
+
+    Creates TrackedFile records as needed.  Returns counts.
+    """
+    project = await db.get(Project, project_id)
+    if not project:
+        return {"status": "error", "error": "Project not found"}
+
+    # Build file_path -> TrackedFile mapping (create if needed)
+    file_paths = {s["file_path"] for s in sorries}
+    existing = (
+        await db.scalars(
+            select(TrackedFile).where(
+                TrackedFile.project_id == project_id,
+                TrackedFile.file_path.in_(file_paths),
+            )
+        )
+    ).all()
+    file_map: dict[str, TrackedFile] = {tf.file_path: tf for tf in existing}
+
+    for fp in file_paths:
+        if fp not in file_map:
+            tf = TrackedFile(project_id=project_id, file_path=fp)
+            db.add(tf)
+            await db.flush()
+            file_map[fp] = tf
+
+    created = 0
+    skipped = 0
+    for s in sorries:
+        tf = file_map[s["file_path"]]
+        goal = s["goal_state"]
+        goal_hash = hashlib.sha256(goal.encode()).hexdigest()[:16]
+        sorry_index = s.get("sorry_index", 0)
+        decl = s["declaration_name"]
+
+        # Check for existing sorry with same identity
+        exists = await db.scalar(
+            select(func.count()).select_from(Sorry).where(
+                Sorry.file_id == tf.id,
+                Sorry.declaration_name == decl,
+                Sorry.sorry_index == sorry_index,
+                Sorry.goal_hash == goal_hash,
+                Sorry.status.notin_(["invalid", "filled", "filled_externally"]),
+            )
+        )
+        if exists:
+            skipped += 1
+            continue
+
+        sorry = Sorry(
+            file_id=tf.id,
+            project_id=project_id,
+            declaration_name=decl,
+            sorry_index=sorry_index,
+            goal_state=goal,
+            local_context=s.get("local_context"),
+            goal_hash=goal_hash,
+            priority=s.get("priority", "normal"),
+            line=s.get("line"),
+            col=s.get("col"),
+        )
+        db.add(sorry)
+        created += 1
+
+    await db.flush()
+
+    # Update sorry counts on tracked files
+    for tf in file_map.values():
+        count = await db.scalar(
+            select(func.count()).select_from(Sorry).where(
+                Sorry.file_id == tf.id,
+                Sorry.status.notin_(["invalid"]),
+            )
+        )
+        await db.execute(
+            text("UPDATE tracked_files SET sorry_count = :count WHERE id = :id"),
+            {"count": count or 0, "id": str(tf.id)},
+        )
+
+    await db.flush()
+    return {"status": "ok", "created": created, "skipped": skipped}
