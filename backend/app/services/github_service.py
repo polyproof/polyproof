@@ -110,10 +110,12 @@ def replace_sorry_in_declaration(
     """
     short_name = declaration_name.rsplit(".", 1)[-1]
 
-    # Find the declaration — allow optional modifiers before the keyword
+    # Find the declaration — allow optional modifiers before the keyword.
+    # Use lookahead instead of \b because names can end with ' (prime),
+    # which is not a word character, so \b fails after it.
     pattern = re.compile(
         rf"^(?:@\[.*?\]\s+)?(?:noncomputable\s+|private\s+|protected\s+)*"
-        rf"(theorem|lemma|def|instance)\s+{re.escape(short_name)}\b",
+        rf"(theorem|lemma|def|instance)\s+{re.escape(short_name)}(?=[\s{{(:]|$)",
         re.MULTILINE,
     )
     match = pattern.search(file_content)

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -103,11 +104,14 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
     except github_service.GitHubError as e:
         return await _fail_job(db, job, f"Could not fetch source file: {e}")
 
+    # Detect decomposition: if tactics contain sorry, this is a partial fill
+    is_decomposition = _tactics_contain_sorry(job.tactics)
+
     result = await lean_client.verify_in_file(
         file_content=file_content,
         declaration_name=sorry.declaration_name,
         tactics=job.tactics,
-        allow_sorry=False,
+        allow_sorry=is_decomposition,
     )
 
     # Step 5: Handle compilation result
@@ -118,10 +122,7 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
         return await _fail_job(db, job, result.error or "Compilation timed out")
 
     # Step 6/7: Compilation passed
-    # Check if the tactics introduced new sorry's (decomposition)
-    has_remaining_sorries = _tactics_contain_sorry(job.tactics)
-
-    if has_remaining_sorries:
+    if is_decomposition:
         # Decomposition: mark sorry as decomposed, create child sorry records
         await db.execute(
             text("""
@@ -261,7 +262,7 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
         .where(Job.id == job.id)
         .values(
             status="merged",
-            result={"sorry_status": "decomposed" if has_remaining_sorries else "filled"},
+            result={"sorry_status": "decomposed" if is_decomposition else "filled"},
             completed_at=datetime.now(UTC),
         )
     )
@@ -274,7 +275,7 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
     return {
         "status": "merged",
         "job_id": str(job.id),
-        "sorry_status": "decomposed" if has_remaining_sorries else "filled",
+        "sorry_status": "decomposed" if is_decomposition else "filled",
     }
 
 
@@ -327,11 +328,16 @@ async def start_worker(project_id: UUID) -> None:
 
 
 def _tactics_contain_sorry(tactics: str) -> bool:
-    """Check if tactics contain sorry (indicating decomposition)."""
-    # Simple check: look for 'sorry' as a standalone tactic
-    import re
+    """Check if tactics contain sorry outside of comments (indicating decomposition).
 
-    return bool(re.search(r"\bsorry\b", tactics))
+    Strips Lean line comments (-- ...) and block comments (/- ... -/)
+    before checking, so ``-- sorry`` in a comment doesn't trigger.
+    """
+    # Strip block comments (non-greedy, handles nesting poorly but good enough)
+    stripped = re.sub(r"/-.*?-/", "", tactics, flags=re.DOTALL)
+    # Strip line comments
+    stripped = re.sub(r"--.*$", "", stripped, flags=re.MULTILINE)
+    return bool(re.search(r"\bsorry\b", stripped))
 
 
 async def _fail_job(
