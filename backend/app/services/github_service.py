@@ -165,6 +165,54 @@ def replace_sorry_in_declaration(
     )
 
 
+def map_positions_to_declarations(
+    file_content: str,
+    positions: list[tuple[int, int]],
+) -> list[str | None]:
+    """Map (line, col) positions to their enclosing declaration names.
+
+    Scans the file for theorem/lemma/def/instance declarations and builds
+    a sorted list of (start_line, name) pairs. For each position, returns
+    the name of the declaration that contains it, or None if not found.
+
+    Lines are 1-indexed (matching Lean's output).
+    """
+    # Find all declarations with their line numbers
+    decl_pattern = re.compile(
+        r"^(?:@\[.*?\]\s+)?(?:noncomputable\s+|private\s+|protected\s+)*"
+        r"(theorem|lemma|def|instance)\s+(\S+)",
+        re.MULTILINE,
+    )
+
+    decls: list[tuple[int, str]] = []
+    for m in decl_pattern.finditer(file_content):
+        # Convert character offset to 1-indexed line number
+        line_num = file_content[:m.start()].count("\n") + 1
+        name = m.group(2)
+        # Strip trailing type annotation chars
+        name = name.rstrip(":{(⦃[")
+        decls.append((line_num, name))
+
+    if not decls:
+        return [None] * len(positions)
+
+    # Sort by line number
+    decls.sort()
+
+    results: list[str | None] = []
+    for line, _col in positions:
+        # Find the last declaration that starts at or before this line
+        enclosing = None
+        for decl_line, decl_name in decls:
+            if decl_line <= line:
+                enclosing = decl_name
+            else:
+                break
+        results.append(enclosing)
+
+    return results
+
+
 def _headers() -> dict[str, str]:
     """Build GitHub API request headers."""
     h = {

@@ -39,27 +39,6 @@ ADMIN_KEY = os.environ["ADMIN_API_KEY"]
 LEAN_URL = os.environ["LEAN_SERVER_URL"]
 LEAN_SECRET = os.environ.get("LEAN_SERVER_SECRET", "")
 
-EXTRACT_TEMPLATE = """import {module}
-
-open Lean Elab Command Meta in
-run_cmd do
-  let env ← getEnv
-  let modName := `{module}
-  let some modIdx := env.getModuleIdx? modName | return
-  for (name, ci) in env.constants.map₁.toArray do
-    if env.getModuleIdxFor? name == some modIdx then
-      let hasSorry := match ci with
-        | .thmInfo val => val.value.hasSorry
-        | .defnInfo val => val.value.hasSorry
-        | _ => false
-      if hasSorry then
-        let typeStr ← liftTermElabM do
-          let fmt ← ppExpr ci.type
-          return toString fmt
-        logInfo m!"SORRY|||{{name}}|||{{typeStr}}"
-"""
-
-
 def discover_sorry_files(
     ssh_host: str, workspace_path: str, source_prefix: str, ssh_user: str = "root"
 ) -> list[str]:
@@ -110,43 +89,88 @@ async def query_lean(code: str, timeout: int = 120) -> dict:
         return data["results"][0] if data.get("results") else {}
 
 
-async def extract_sorries_from_file(file_path: str) -> list[dict]:
-    """Extract all sorry'd declarations from a single Lean file via metaprogram."""
-    module = file_path.replace("/", ".").removesuffix(".lean")
-    code = EXTRACT_TEMPLATE.format(module=module)
+async def extract_sorries_from_file(
+    file_path: str, ssh_host: str, workspace_path: str, ssh_user: str = "root"
+) -> list[dict]:
+    """Extract sorry's by compiling the file and reading the REPL's sorries field.
 
-    result = await query_lean(code)
+    Fetches the file content via SSH, sends it to Kimina for compilation,
+    and parses the goal states from the response's ``sorries`` array.
+    Maps each sorry position to its enclosing declaration name.
+    """
+    import re
+    import subprocess as sp
+
+    # Fetch file content via SSH
+    full_path = f"{workspace_path}/{file_path}"
+    try:
+        cat_result = sp.run(
+            ["ssh", f"{ssh_user}@{ssh_host}", f"cat {shlex.quote(full_path)}"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if cat_result.returncode != 0:
+            print(f"    ERROR: could not read {file_path}")
+            return []
+        file_content = cat_result.stdout
+    except sp.TimeoutExpired:
+        print(f"    ERROR: SSH timed out reading {file_path}")
+        return []
+
+    # Compile the file on Kimina
+    result = await query_lean(file_content, timeout=300)
 
     if "error" in result and isinstance(result["error"], str):
         print(f"    ERROR: {result['error'][:100]}")
         return []
 
     resp = result.get("response", {})
-    messages = resp.get("messages", []) if resp else []
+    raw_sorries = resp.get("sorries", []) if resp else []
 
-    errors = [m for m in messages if m.get("severity") == "error"]
-    if errors:
-        print(f"    ERROR: {errors[0].get('data', 'unknown')[:100]}")
+    if not raw_sorries:
         return []
 
+    # Map positions to declaration names
+    decl_pattern = re.compile(
+        r"^(?:@\[.*?\]\s+)?(?:noncomputable\s+|private\s+|protected\s+)*"
+        r"(theorem|lemma|def|instance)\s+(\S+)",
+        re.MULTILINE,
+    )
+    decls: list[tuple[int, str]] = []
+    for m in decl_pattern.finditer(file_content):
+        line_num = file_content[:m.start()].count("\n") + 1
+        name = m.group(2).rstrip(":{(⦃[")
+        decls.append((line_num, name))
+    decls.sort()
+
+    # Build sorry records
+    decl_counts: dict[str, int] = {}
     sorries = []
-    for msg in messages:
-        if msg.get("severity") != "info":
-            continue
-        data = msg.get("data", "")
-        if not data.startswith("SORRY|||"):
+    for s in raw_sorries:
+        pos = s.get("pos", {})
+        line = pos.get("line", 0)
+        goal = s.get("goal", "")
+
+        # Find enclosing declaration
+        enclosing = None
+        for decl_line, decl_name in decls:
+            if decl_line <= line:
+                enclosing = decl_name
+            else:
+                break
+
+        if enclosing is None:
             continue
 
-        parts = data.split("|||", 2)
-        if len(parts) != 3:
-            continue
+        idx = decl_counts.get(enclosing, 0)
+        decl_counts[enclosing] = idx + 1
 
-        _, name, goal_state = parts
         sorries.append({
             "file_path": file_path,
-            "declaration_name": name.strip(),
-            "sorry_index": 0,
-            "goal_state": goal_state.strip(),
+            "declaration_name": enclosing,
+            "sorry_index": idx,
+            "goal_state": goal,
+            "line": line,
+            "col": pos.get("column"),
             "priority": "normal",
         })
 
@@ -219,15 +243,16 @@ async def main():
         print("No files with sorry found. Nothing to seed.")
         return
 
-    # Step 2: Extract sorry'd declarations via Lean metaprogram
-    # (filters out commented-out sorry's — only finds real sorry'd declarations)
+    # Step 2: Compile each file and extract sorry's from the REPL response
     all_sorries = []
     files_with_sorries = []
 
     for i, file_path in enumerate(candidate_files, 1):
         module = file_path.replace("/", ".").removesuffix(".lean")
         print(f"\n  [{i}/{len(candidate_files)}] {module}...")
-        sorries = await extract_sorries_from_file(file_path)
+        sorries = await extract_sorries_from_file(
+            file_path, args.lean_server_host, args.workspace, args.lean_server_user
+        )
         if sorries:
             print(f"    {len(sorries)} sorry'd declarations:")
             for s in sorries:

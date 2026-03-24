@@ -66,10 +66,22 @@ ALLOWED_AXIOMS = {"propext", "Classical.choice", "Quot.sound"}
 
 
 @dataclass
+class LeanSorry:
+    """A sorry position + goal state from the Lean REPL."""
+
+    line: int
+    col: int
+    end_line: int
+    end_col: int
+    goal: str  # tactic goal state, e.g. "n : Nat\n⊢ n + 0 = n"
+
+
+@dataclass
 class LeanResult:
     status: str  # "passed" | "rejected" | "timeout"
     error: str | None = None
     messages: list[dict] | None = field(default=None)
+    sorries: list[LeanSorry] | None = field(default=None)
 
 
 async def verify_in_file(
@@ -312,8 +324,26 @@ async def _send_to_lean(
                         messages=messages,
                     )
 
+            # Parse sorry positions + goal states from the REPL
+            raw_sorries = resp.get("sorries", []) if resp else []
+            parsed_sorries = [
+                LeanSorry(
+                    line=s["pos"]["line"],
+                    col=s["pos"]["column"],
+                    end_line=s["endPos"]["line"],
+                    end_col=s["endPos"]["column"],
+                    goal=s.get("goal", ""),
+                )
+                for s in raw_sorries
+                if "pos" in s and "endPos" in s
+            ]
+
             # No errors -- compilation passed
-            return LeanResult(status="passed", messages=messages)
+            return LeanResult(
+                status="passed",
+                messages=messages,
+                sorries=parsed_sorries or None,
+            )
 
     except httpx.TimeoutException:
         return LeanResult(

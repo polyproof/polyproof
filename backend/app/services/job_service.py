@@ -162,10 +162,35 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
             details={"job_id": str(job.id)},
         )
 
-        # Child sorry extraction: the Lean workspace hasn't been rebuilt yet,
-        # so the metaprogram can't see the new sorry's. Child sorry's are
-        # created on the next full re-extraction (admin runs seed_project.py
-        # or POST /projects/{id}/import-sorries after workspace rebuild).
+        # Invalidate any existing children (handles re-decomposition)
+        await _invalidate_descendants(sorry_id, db)
+
+        # Create child sorry records from the compilation output.
+        # The REPL's `sorries` field gives us goal states for each sorry
+        # in the compiled file — no workspace rebuild needed.
+        if result.sorries:
+            try:
+                patched = github_service.replace_sorry_in_declaration(
+                    file_content, sorry.declaration_name, job.tactics
+                )
+                _create_child_sorries(
+                    db=db,
+                    parent_sorry=sorry,
+                    tracked_file=tracked_file,
+                    original_content=file_content,
+                    patched_content=patched,
+                    lean_sorries=result.sorries,
+                )
+                await db.flush()
+                logger.info(
+                    "Created child sorry records for %s",
+                    sorry.declaration_name,
+                )
+            except Exception:
+                logger.exception(
+                    "Child sorry creation failed for %s (decomposition still recorded)",
+                    sorry_id,
+                )
     else:
         # Full fill: mark sorry as filled
         rows_updated = (
@@ -398,6 +423,74 @@ async def _supersede_queued_for_sorry(
         )
     )
     return result.rowcount
+
+
+def _create_child_sorries(
+    db: AsyncSession,
+    parent_sorry: Sorry,
+    tracked_file: TrackedFile,
+    original_content: str,
+    patched_content: str,
+    lean_sorries: list,
+) -> None:
+    """Create child sorry records from the REPL's sorries field.
+
+    Compares sorry positions in the patched file against the original
+    to find only NEW sorry's introduced by the decomposition. Filters
+    to sorry's within the parent declaration's boundaries.
+    """
+    import hashlib
+
+    short_name = parent_sorry.declaration_name.rsplit(".", 1)[-1]
+
+    # Map sorry positions in the patched file to declaration names
+    decl_names = github_service.map_positions_to_declarations(
+        patched_content,
+        [(s.line, s.col) for s in lean_sorries],
+    )
+
+    # Find sorry positions in the ORIGINAL file to exclude pre-existing ones
+    original_sorry_positions: set[tuple[int, int]] = set()
+    for line_idx, line_text in enumerate(original_content.splitlines(), 1):
+        col = line_text.find("sorry")
+        while col >= 0:
+            original_sorry_positions.add((line_idx, col))
+            col = line_text.find("sorry", col + 1)
+
+    child_index = 0
+    for sorry_info, enclosing_name in zip(lean_sorries, decl_names):
+        # Only create children within the parent declaration
+        if enclosing_name is None:
+            continue
+        if enclosing_name != short_name and not enclosing_name.endswith(
+            "." + short_name
+        ):
+            continue
+
+        # Skip sorry's that existed in the original file (same position)
+        if (sorry_info.line, sorry_info.col) in original_sorry_positions:
+            continue
+
+        goal = sorry_info.goal
+        if not goal:
+            continue
+
+        goal_hash = hashlib.sha256(goal.encode()).hexdigest()[:16]
+
+        child = Sorry(
+            file_id=tracked_file.id,
+            project_id=parent_sorry.project_id,
+            declaration_name=parent_sorry.declaration_name,
+            sorry_index=child_index,
+            goal_state=goal,
+            goal_hash=goal_hash,
+            parent_sorry_id=parent_sorry.id,
+            line=sorry_info.line,
+            col=sorry_info.col,
+            priority="normal",
+        )
+        db.add(child)
+        child_index += 1
 
 
 async def _invalidate_descendants(sorry_id: UUID, db: AsyncSession) -> int:
