@@ -8,10 +8,12 @@ from uuid import UUID
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.job import Job
+from app.models.project import Project
 from app.models.sorry import Sorry
 from app.models.tracked_file import TrackedFile
-from app.services import activity_service, lean_client
+from app.services import activity_service, github_service, lean_client
 
 logger = logging.getLogger(__name__)
 
@@ -191,8 +193,56 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
             details={"job_id": str(job.id), "status": "merged"},
         )
 
-    # Git commit simulation (MVP: log instead of actual commit)
-    logger.info("MVP: would commit fill to fork repo for sorry %s", sorry_id)
+    # Commit the fill to the GitHub fork (best-effort — fill is recorded regardless)
+    # Sequential job processing per project guarantees no SHA conflicts.
+    if settings.GITHUB_PAT and tracked_file:
+        try:
+            project = await db.get(Project, job.project_id)
+            if project:
+                repo = github_service.parse_repo(project.fork_repo)
+                file_content, file_sha = await github_service.get_file_content(
+                    repo, tracked_file.file_path, project.fork_branch
+                )
+                new_content = github_service.replace_sorry_in_declaration(
+                    file_content, sorry.declaration_name, job.tactics
+                )
+                agent_handle = None
+                if job.agent_id:
+                    agent_row = await db.execute(
+                        text("SELECT handle FROM agents WHERE id = :id"),
+                        {"id": str(job.agent_id)},
+                    )
+                    row = agent_row.first()
+                    agent_handle = row.handle if row else None
+
+                commit_msg = (
+                    f"fill: {sorry.declaration_name}\n\n"
+                    f"{job.description or 'sorry filled'}\n\n"
+                    f"Agent: @{agent_handle or 'unknown'}"
+                )
+                new_sha = await github_service.commit_file(
+                    repo,
+                    tracked_file.file_path,
+                    new_content,
+                    commit_msg,
+                    project.fork_branch,
+                    file_sha,
+                    author_name=agent_handle or "PolyProof",
+                    author_email="noreply@polyproof.org",
+                )
+                await db.execute(
+                    text("UPDATE projects SET current_commit = :sha WHERE id = :id"),
+                    {"sha": new_sha, "id": str(project.id)},
+                )
+                logger.info(
+                    "Committed fill for %s -> %s", sorry.declaration_name, new_sha[:8]
+                )
+        except Exception:
+            logger.exception(
+                "GitHub commit failed for sorry %s (fill still recorded)", sorry_id
+            )
+    else:
+        logger.info("GITHUB_PAT not set — skipping commit for sorry %s", sorry_id)
 
     # Mark job as merged
     await db.execute(

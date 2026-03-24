@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     TWITTER_CLIENT_SECRET: str = ""
     TWITTER_REDIRECT_URI: str = ""
     SESSION_SECRET: str = ""
+    GITHUB_PAT: str = ""
 
     @model_validator(mode="after")
     def _require_secrets_in_production(self) -> "Settings":
