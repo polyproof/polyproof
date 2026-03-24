@@ -5,11 +5,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from app.api.deps import DbSession
 from app.api.rate_limit import ip_limiter
 from app.config import settings
 from app.errors import NotFoundError
+from app.models.tracked_file import TrackedFile
 from app.schemas.activity import ActivityFeedResponse
 from app.schemas.project import (
     ProjectCreate,
@@ -197,3 +199,48 @@ async def import_sorries(
         db, project_id, [s.model_dump() for s in body]
     )
     return result
+
+
+@router.post("/{project_id}/extract-sorries")
+async def extract_sorries(
+    request: Request,
+    project_id: UUID,
+    db: DbSession,
+) -> dict[str, Any]:
+    """Re-extract sorry's from the Lean server for all tracked files. Admin only.
+
+    Runs the Lean metaprogram on each tracked file, diffs against existing
+    sorry records, and creates new ones. Use after a decomposition commit
+    to populate child sorry's once the Lean workspace has been rebuilt.
+    """
+    await _require_admin(request)
+
+    project = await project_service.get_by_id(db, project_id)
+    if not project:
+        raise NotFoundError("Project")
+
+    from app.services import extraction_service
+
+    files = (
+        await db.scalars(
+            select(TrackedFile)
+            .where(TrackedFile.project_id == project_id)
+            .order_by(TrackedFile.file_path.asc())
+        )
+    ).all()
+
+    total_created = 0
+    total_skipped = 0
+    for tf in files:
+        result = await extraction_service.sync_sorries_for_file(
+            db, project_id=project_id, tracked_file=tf
+        )
+        total_created += result.get("created", 0)
+        total_skipped += result.get("skipped", 0)
+
+    return {
+        "status": "ok",
+        "files_scanned": len(files),
+        "created": total_created,
+        "skipped": total_skipped,
+    }

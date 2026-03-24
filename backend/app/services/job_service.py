@@ -161,6 +161,11 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
             agent_id=job.agent_id,
             details={"job_id": str(job.id)},
         )
+
+        # Child sorry extraction: the Lean workspace hasn't been rebuilt yet,
+        # so the metaprogram can't see the new sorry's. Child sorry's are
+        # created on the next full re-extraction (admin runs seed_project.py
+        # or POST /projects/{id}/import-sorries after workspace rebuild).
     else:
         # Full fill: mark sorry as filled
         rows_updated = (
