@@ -173,7 +173,7 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
                 patched = github_service.replace_sorry_in_declaration(
                     file_content, sorry.declaration_name, job.tactics
                 )
-                _create_child_sorries(
+                await _create_child_sorries(
                     db=db,
                     parent_sorry=sorry,
                     tracked_file=tracked_file,
@@ -181,7 +181,6 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
                     patched_content=patched,
                     lean_sorries=result.sorries,
                 )
-                await db.flush()
                 logger.info(
                     "Created child sorry records for %s",
                     sorry.declaration_name,
@@ -425,7 +424,7 @@ async def _supersede_queued_for_sorry(
     return result.rowcount
 
 
-def _create_child_sorries(
+async def _create_child_sorries(
     db: AsyncSession,
     parent_sorry: Sorry,
     tracked_file: TrackedFile,
@@ -491,6 +490,8 @@ def _create_child_sorries(
         )
         db.add(child)
         child_index += 1
+
+    await db.flush()
 
 
 async def _invalidate_descendants(sorry_id: UUID, db: AsyncSession) -> int:

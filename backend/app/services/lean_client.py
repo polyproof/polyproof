@@ -213,13 +213,15 @@ def _check_axioms(result: LeanResult) -> LeanResult:
     for msg in result.messages:
         data = msg.get("data", "")
 
-        # Check for sorryAx anywhere in the output
-        if "sorryAx" in data:
-            return LeanResult(status="rejected", error="Tactics use sorry")
-
-        # Parse the axiom list from #print axioms output
+        # Parse the axiom list from #print axioms output (severity "info" only).
+        # We only check for sorryAx in these lines — not in warning messages,
+        # which may mention sorryAx from OTHER sorry's elsewhere in the file.
         if msg.get("severity") == "info" and "depends on axioms" in data:
             found_axiom_info = True
+
+            if "sorryAx" in data:
+                return LeanResult(status="rejected", error="Tactics use sorry")
+
             start = data.find("[")
             end = data.find("]")
             if start >= 0 and end >= 0:
