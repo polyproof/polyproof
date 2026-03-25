@@ -29,13 +29,11 @@ def parse_repo(fork_repo_url: str) -> str:
         url = url[:-4]
     prefix = "https://github.com/"
     if url.startswith(prefix):
-        return url[len(prefix):]
+        return url[len(prefix) :]
     raise GitHubError(f"Cannot parse GitHub repo from URL: {fork_repo_url}")
 
 
-async def get_file_content(
-    repo: str, path: str, branch: str
-) -> tuple[str, str]:
+async def get_file_content(repo: str, path: str, branch: str) -> tuple[str, str]:
     """Fetch a file from GitHub and return (decoded_content, blob_sha).
 
     Uses the GitHub Contents API. The blob SHA is needed for subsequent
@@ -49,8 +47,7 @@ async def get_file_content(
         )
         if resp.status_code != 200:
             raise GitHubError(
-                f"GET /repos/{repo}/contents/{path} returned {resp.status_code}: "
-                f"{resp.text[:200]}"
+                f"GET /repos/{repo}/contents/{path} returned {resp.status_code}: {resp.text[:200]}"
             )
 
         data = resp.json()
@@ -88,8 +85,7 @@ async def commit_file(
         )
         if resp.status_code not in (200, 201):
             raise GitHubError(
-                f"PUT /repos/{repo}/contents/{path} returned {resp.status_code}: "
-                f"{resp.text[:200]}"
+                f"PUT /repos/{repo}/contents/{path} returned {resp.status_code}: {resp.text[:200]}"
             )
 
         return resp.json()["commit"]["sha"]
@@ -121,9 +117,7 @@ def replace_sorry_in_declaration(
     )
     match = pattern.search(file_content)
     if not match:
-        raise GitHubError(
-            f"Declaration '{short_name}' not found in file content"
-        )
+        raise GitHubError(f"Declaration '{short_name}' not found in file content")
 
     decl_start = match.start()
 
@@ -153,7 +147,7 @@ def replace_sorry_in_declaration(
     # Determine indentation of the sorry line
     line_start = file_content.rfind("\n", 0, sorry_match.start()) + 1
     indent = ""
-    for ch in file_content[line_start:sorry_match.start()]:
+    for ch in file_content[line_start : sorry_match.start()]:
         if ch in (" ", "\t"):
             indent += ch
         else:
@@ -165,11 +159,38 @@ def replace_sorry_in_declaration(
     for line in tactic_lines[1:]:
         indented += "\n" + indent + line
 
-    return (
-        file_content[:sorry_match.start()]
-        + indented
-        + file_content[sorry_match.end():]
+    return file_content[: sorry_match.start()] + indented + file_content[sorry_match.end() :]
+
+
+def count_sorries_in_declaration(
+    file_content: str,
+    declaration_name: str,
+) -> int:
+    """Count the number of ``sorry`` occurrences in a declaration's body.
+
+    Returns 0 if the declaration is not found.
+    """
+    short_name = declaration_name.rsplit(".", 1)[-1]
+
+    pattern = re.compile(
+        rf"^(?:@\[.*?\]\s+)?(?:noncomputable\s+|private\s+|protected\s+)*"
+        rf"(theorem|lemma|def|instance)\s+{re.escape(short_name)}(?=[\s{{(:]|$)",
+        re.MULTILINE,
     )
+    match = pattern.search(file_content)
+    if not match:
+        return 0
+
+    next_decl = re.compile(
+        r"^(?:@\[.*?\]\s+)?(?:noncomputable\s+|private\s+|protected\s+)*"
+        r"(?:theorem|lemma|def|instance|class|structure|inductive|abbrev)\s",
+        re.MULTILINE,
+    )
+    next_match = next_decl.search(file_content, match.end())
+    decl_end = next_match.start() if next_match else len(file_content)
+
+    sorry_pattern = re.compile(r"\bsorry\b")
+    return len(sorry_pattern.findall(file_content, match.start(), decl_end))
 
 
 def map_positions_to_declarations(
@@ -194,7 +215,7 @@ def map_positions_to_declarations(
     decls: list[tuple[int, str]] = []
     for m in decl_pattern.finditer(file_content):
         # Convert character offset to 1-indexed line number
-        line_num = file_content[:m.start()].count("\n") + 1
+        line_num = file_content[: m.start()].count("\n") + 1
         name = m.group(2)
         # Strip trailing type annotation chars
         name = name.rstrip(":{(⦃[")

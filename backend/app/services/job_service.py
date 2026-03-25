@@ -77,9 +77,7 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
     was_decomposed = locked_row.status == "decomposed"
 
     # Step 2: Mark job as compiling
-    await db.execute(
-        update(Job).where(Job.id == job.id).values(status="compiling")
-    )
+    await db.execute(update(Job).where(Job.id == job.id).values(status="compiling"))
     await db.flush()
 
     # Step 3: Read sorry + tracked file for compilation context
@@ -107,17 +105,20 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
     # Detect decomposition: if tactics contain sorry, this is a partial fill
     is_decomposition = _tactics_contain_sorry(job.tactics)
 
-    # Child sorry's have siblings with sorry's in the same declaration.
-    # #print axioms checks the whole declaration, so it always reports
-    # sorryAx from siblings. Allow sorry for child fills — the tactic-level
-    # sorry check above is sufficient.
+    # Declarations can contain multiple sorry's. #print axioms checks the
+    # WHOLE declaration, so it reports sorryAx from OTHER sorry's that we're
+    # not filling. Skip the axiom check when siblings exist — the
+    # tactic-level sorry check above is sufficient.
     is_child_sorry = sorry.parent_sorry_id is not None
+    has_sibling_sorries = (
+        github_service.count_sorries_in_declaration(file_content, sorry.declaration_name) > 1
+    )
 
     result = await lean_client.verify_in_file(
         file_content=file_content,
         declaration_name=sorry.declaration_name,
         tactics=job.tactics,
-        allow_sorry=is_decomposition or is_child_sorry,
+        allow_sorry=is_decomposition or is_child_sorry or has_sibling_sorries,
         sorry_index=sorry.sorry_index,
     )
 
@@ -153,8 +154,7 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
         if job.agent_id:
             await db.execute(
                 text(
-                    "UPDATE agents SET sorries_decomposed = sorries_decomposed + 1"
-                    " WHERE id = :id"
+                    "UPDATE agents SET sorries_decomposed = sorries_decomposed + 1 WHERE id = :id"
                 ),
                 {"id": str(job.agent_id)},
             )
@@ -178,7 +178,9 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
         if result.sorries:
             try:
                 patched = github_service.replace_sorry_in_declaration(
-                    file_content, sorry.declaration_name, job.tactics,
+                    file_content,
+                    sorry.declaration_name,
+                    job.tactics,
                     sorry_index=sorry.sorry_index,
                 )
                 await _create_child_sorries(
@@ -253,7 +255,9 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
                 repo, tracked_file.file_path, project.fork_branch
             )
             new_content = github_service.replace_sorry_in_declaration(
-                file_content, sorry.declaration_name, job.tactics,
+                file_content,
+                sorry.declaration_name,
+                job.tactics,
                 sorry_index=sorry.sorry_index,
             )
             agent_handle = None
@@ -284,13 +288,9 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
                 text("UPDATE projects SET current_commit = :sha WHERE id = :id"),
                 {"sha": new_sha, "id": str(project.id)},
             )
-            logger.info(
-                "Committed fill for %s -> %s", sorry.declaration_name, new_sha[:8]
-            )
+            logger.info("Committed fill for %s -> %s", sorry.declaration_name, new_sha[:8])
         except Exception:
-            logger.exception(
-                "GitHub commit failed for sorry %s (fill still recorded)", sorry_id
-            )
+            logger.exception("GitHub commit failed for sorry %s (fill still recorded)", sorry_id)
     else:
         logger.info("GITHUB_PAT not set — skipping commit for sorry %s", sorry_id)
 
@@ -470,9 +470,7 @@ async def _create_child_sorries(
         # Only create children within the parent declaration
         if enclosing_name is None:
             continue
-        if enclosing_name != short_name and not enclosing_name.endswith(
-            "." + short_name
-        ):
+        if enclosing_name != short_name and not enclosing_name.endswith("." + short_name):
             continue
 
         # Skip sorry's that existed in the original file (same position)
