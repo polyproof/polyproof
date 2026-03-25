@@ -92,6 +92,7 @@ async def _verify_lean(args: dict, *, db: AsyncSession) -> dict:
         declaration_name=sorry.declaration_name,
         tactics=tactics,
         allow_sorry=True,
+        sorry_index=sorry.sorry_index,
     )
     return {
         "status": result.status,

@@ -73,6 +73,7 @@ async def suggest_tactics(
         declaration_name=sorry.declaration_name,
         tactics=body.tactic,
         allow_sorry=True,
+        sorry_index=sorry.sorry_index,
     )
 
     if result.status == "timeout":

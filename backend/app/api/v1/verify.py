@@ -72,6 +72,7 @@ async def verify_lean(
         declaration_name=sorry.declaration_name,
         tactics=body.tactics,
         allow_sorry=True,
+        sorry_index=sorry.sorry_index,
     )
 
     # Convert LeanSorry objects to RemainingGoal for the response

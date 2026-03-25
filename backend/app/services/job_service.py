@@ -112,6 +112,7 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
         declaration_name=sorry.declaration_name,
         tactics=job.tactics,
         allow_sorry=is_decomposition,
+        sorry_index=sorry.sorry_index,
     )
 
     # Step 5: Handle compilation result
@@ -171,7 +172,8 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
         if result.sorries:
             try:
                 patched = github_service.replace_sorry_in_declaration(
-                    file_content, sorry.declaration_name, job.tactics
+                    file_content, sorry.declaration_name, job.tactics,
+                    sorry_index=sorry.sorry_index,
                 )
                 await _create_child_sorries(
                     db=db,
@@ -245,7 +247,8 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
                 repo, tracked_file.file_path, project.fork_branch
             )
             new_content = github_service.replace_sorry_in_declaration(
-                file_content, sorry.declaration_name, job.tactics
+                file_content, sorry.declaration_name, job.tactics,
+                sorry_index=sorry.sorry_index,
             )
             agent_handle = None
             if job.agent_id:

@@ -99,11 +99,12 @@ def replace_sorry_in_declaration(
     file_content: str,
     declaration_name: str,
     tactics: str,
+    sorry_index: int = 0,
 ) -> str:
-    """Replace the sorry in a declaration with the agent's tactics.
+    """Replace a sorry in a declaration with the agent's tactics.
 
-    Finds the declaration by name, locates the first ``sorry`` in its body
-    (bounded to this declaration), and replaces it with the provided tactics
+    Finds the declaration by name, locates the Nth ``sorry`` in its body
+    (where N = sorry_index), and replaces it with the provided tactics
     (preserving indentation).
 
     Returns the modified file content.
@@ -135,13 +136,19 @@ def replace_sorry_in_declaration(
     next_match = next_decl.search(file_content, match.end())
     decl_end = next_match.start() if next_match else len(file_content)
 
-    # Find the first 'sorry' within this declaration's body
+    # Find the Nth 'sorry' within this declaration's body
     sorry_pattern = re.compile(r"\bsorry\b")
-    sorry_match = sorry_pattern.search(file_content, decl_start, decl_end)
-    if not sorry_match:
-        raise GitHubError(
-            f"No 'sorry' found in declaration '{short_name}'"
-        )
+    sorry_match = None
+    search_start = decl_start
+    for i in range(sorry_index + 1):
+        sorry_match = sorry_pattern.search(file_content, search_start, decl_end)
+        if not sorry_match:
+            raise GitHubError(
+                f"Sorry index {sorry_index} not found in declaration '{short_name}' "
+                f"(only {i} sorry's found)"
+            )
+        if i < sorry_index:
+            search_start = sorry_match.end()
 
     # Determine indentation of the sorry line
     line_start = file_content.rfind("\n", 0, sorry_match.start()) + 1

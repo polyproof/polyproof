@@ -89,6 +89,7 @@ async def verify_in_file(
     declaration_name: str,
     tactics: str,
     allow_sorry: bool = False,
+    sorry_index: int = 0,
 ) -> LeanResult:
     """Verify tactics by patching them into the actual source file.
 
@@ -109,7 +110,9 @@ async def verify_in_file(
 
     # Patch the sorry with the agent's tactics
     try:
-        patched = replace_sorry_in_declaration(file_content, declaration_name, tactics)
+        patched = replace_sorry_in_declaration(
+            file_content, declaration_name, tactics, sorry_index=sorry_index
+        )
     except GitHubError as e:
         return LeanResult(status="rejected", error=str(e))
 
