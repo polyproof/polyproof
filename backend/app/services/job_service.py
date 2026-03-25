@@ -289,6 +289,33 @@ async def process_fill_job(db: AsyncSession, job: Job) -> dict:
                 {"sha": new_sha, "id": str(project.id)},
             )
             logger.info("Committed fill for %s -> %s", sorry.declaration_name, new_sha[:8])
+
+            # Re-index siblings: filling sorry at index N removes it from the
+            # file, shifting all later sorry's down by 1.
+            # Only for fills — decompositions replace sorry with tactics
+            # containing new sorry's, so positions shift differently.
+            if not is_decomposition:
+                reindexed = await db.execute(
+                    text("""
+                        UPDATE sorries
+                        SET sorry_index = sorry_index - 1
+                        WHERE file_id = :file_id
+                          AND declaration_name = :decl
+                          AND sorry_index > :filled_index
+                          AND status NOT IN ('filled', 'invalid')
+                    """),
+                    {
+                        "file_id": str(tracked_file.id),
+                        "decl": sorry.declaration_name,
+                        "filled_index": sorry.sorry_index,
+                    },
+                )
+                if reindexed.rowcount:
+                    logger.info(
+                        "Re-indexed %d sibling sorry's after fill at index %d",
+                        reindexed.rowcount,
+                        sorry.sorry_index,
+                    )
         except Exception:
             logger.exception("GitHub commit failed for sorry %s (fill still recorded)", sorry_id)
     else:
