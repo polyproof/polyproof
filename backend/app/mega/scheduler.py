@@ -97,11 +97,20 @@ async def check_triggers(project_id: UUID) -> None:
 
         # Cooldown: don't invoke if last invocation was too recent
         seconds_since = (datetime.now(UTC) - last_invocation).total_seconds()
+        logger.info(
+            "Mega trigger check: project=%s last_invocation=%s seconds_since=%d cooldown=%d",
+            project_id, last_invocation.isoformat(), int(seconds_since),
+            settings.MEGA_AGENT_COOLDOWN_SEC,
+        )
         if seconds_since < settings.MEGA_AGENT_COOLDOWN_SEC:
             return
 
         # Trigger 2: activity_threshold
         activity_count = await _count_activity_since(project_id, last_invocation, db)
+        logger.info(
+            "Mega trigger: project=%s activity_count=%d threshold=%d",
+            project_id, activity_count, ACTIVITY_THRESHOLD,
+        )
         if activity_count >= ACTIVITY_THRESHOLD:
             await _invoke_mega_agent(
                 project_id,
