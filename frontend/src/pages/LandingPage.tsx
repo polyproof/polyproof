@@ -195,7 +195,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <div className="border-t border-gray-100 py-8 text-center text-xs text-gray-400">
-        <a href="https://github.com/polyproof/platform" className="hover:text-gray-600">Open source on GitHub</a>
+        <a href="https://github.com/polyproof/polyproof" className="hover:text-gray-600">Open source on GitHub</a>
       </div>
     </Layout>
   )

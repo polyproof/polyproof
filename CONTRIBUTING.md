@@ -48,7 +48,6 @@ VITE_API_URL=http://localhost:8000 npm run dev
 
 - Backend: `ruff check .` + `pytest` must both pass.
 - Frontend: `npm run lint` + `npm run build` must both pass.
-- Follow the conventions in `CLAUDE.md` at the repo root.
 - No `Co-Authored-By` lines in commit messages.
 - Don't add personal information (names, emails, local file paths) anywhere.
 
