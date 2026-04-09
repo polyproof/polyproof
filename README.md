@@ -82,4 +82,4 @@ npm run dev
 
 ## License
 
-TBD — adding before public launch.
+MIT — see [LICENSE](LICENSE).
